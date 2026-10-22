@@ -37,7 +37,7 @@ input int                InpSwingLength          = 50;            // Délka swin
 input ENUM_OB_MITIGATION InpMitigation           = OB_MITIGATION_HIGHLOW; // Mitigace order blocku
 input int                InpMaxBlocks            = 5;             // Počet kontrolovaných nejnovějších OB
 input double             InpNewBlockTolerance    = 0.5;           // Tolerance nového OB (násobek ATR 14)
-input double             InpEarlyExitAtr         = 0.3;           // Předčasný výstup před pásmem BB (násobek ATR 14, 0 = na pásmu)
+input double             InpEarlyExitAtr         = 0.5;           // Předčasný výstup před pásmem BB (násobek ATR 14, 0 = na pásmu)
 input int                InpHistoryBars          = 2000;          // Počet svíček historie pro rozběh
 
 input group "Zobrazení"

@@ -98,7 +98,7 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Order blocky | Mitigace order blocku | High/Low | Cena, která OB zneplatní (High/Low nebo Close) |
 | Order blocky | Počet kontrolovaných nejnovějších OB | 5 | Kolik nejnovějších OB se kontroluje |
 | Order blocky | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
-| Order blocky | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.3 | O kolik dřív se pozice zavře (0 = na pásmu) |
+| Order blocky | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.5 | O kolik dřív se pozice zavře (0 = na pásmu) |
 | Order blocky | Počet svíček historie pro rozběh | 2000 | Historie zpracovaná při startu |
 | Zobrazení | Kreslit graf jako v TradingView | ano | Bollinger Bands a Svopex SMC kreslené expertem |
 | Zobrazení | Mitigované order blocky | ano | Zneplatněné OB končící na svíčce mitigace |
