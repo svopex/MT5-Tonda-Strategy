@@ -43,7 +43,7 @@ MT5 ji ukazuje ve vlastnostech experta):
 
 Commit s novou verzí se označí git tagem `vX.YY` (např. `v1.10`) a tag se pushne spolu s commitem.
 
-Aktuální verze: **1.11** (vypisuje se i v textu vlevo nahoře, např. `TondaStrategy 1.11: ZAPNUTO …`).
+Aktuální verze: **1.12** (vypisuje se i v textu vlevo nahoře, např. `TondaStrategy 1.12: ZAPNUTO …`).
 
 ## Strategie
 
@@ -92,7 +92,7 @@ určuje, odkud se berou:
 
 - SL je pod dolní hranou order blocku (nákup) nebo nad horní hranou (prodej)
   plus odstup. Ten je buď násobkem aktuálního spreadu v okamžiku vstupu (výchozí 1,25 ×,
-  tedy spread zvětšený o 25 %), nebo pevným počtem bodů (výchozí 60) – podle volby
+  tedy spread zvětšený o 25 %; spread se počítá nejméně jako 1 bod), nebo pevným počtem bodů (výchozí 60) – podle volby
   *Odstup SL od order blocku*.
 - Maximální skluz při otevření i zavření pozice je násobek ATR 14 (výchozí 0,15 ×, u XAUUSD M1
   zhruba 20 bodů), takže se přizpůsobuje volatilitě.

@@ -7,7 +7,7 @@
 #property copyright "Petr Svoboda"
 #property link      "https://github.com/svopex/MT5-Tonda-Strategy"
 // Verze experta: vlastnosti experta v MT5 i text vlevo nahoře
-#define EA_VERSION "1.11"
+#define EA_VERSION "1.12"
 #property version   EA_VERSION
 #property description "Order blocky (Svopex SMC) + Bollinger Bands"
 
@@ -242,10 +242,10 @@ string AtrPointsText(const double multiple)
    return IntegerToString(ToPoints(distance)) + " bodů (" + DoubleToString(multiple, 2) + " × ATR " + IntegerToString(ATR_DISTANCE_LENGTH) + ")";
   }
 
-// Aktuální spread v ceně (Ask − Bid)
+// Aktuální spread v ceně (Ask − Bid), nejméně 1 bod (při nulovém spreadu by odstup SL vyšel nulový)
 double CurrentSpread()
   {
-   return SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   return MathMax(SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID), _Point);
   }
 
 // Odstup SL za order blockem v ceně: pevný počet bodů, nebo násobek aktuálního spreadu
