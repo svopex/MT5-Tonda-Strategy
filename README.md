@@ -1,0 +1,2 @@
+# Tondova obchodni strategie
+
