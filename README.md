@@ -31,6 +31,20 @@ a `docs/BollingerBands.pine`.
 3. Přetáhněte experta na graf, nebo ho spusťte v testeru strategií. Strategie pracuje
    na časovém rámci grafu.
 
+## Verzování
+
+Expert se pravidelně verzuje. Při každé změně, která se nasazuje do MT5, se zvýší verze
+v `#property version` v `MQL5/Experts/TondaStrategy/TondaStrategy.mq5` (formát `X.YY`,
+MT5 ji ukazuje ve vlastnostech experta):
+
+- oprava nebo drobná úprava: `+0.01` (např. 1.10 → 1.11),
+- nová funkce nebo změna strategie: další desítka (např. 1.10 → 1.20),
+- zásadní změna chování: `X+1.00` (např. 1.20 → 2.00).
+
+Commit s novou verzí se označí git tagem `vX.YY` (např. `v1.10`) a tag se pushne spolu s commitem.
+
+Aktuální verze: **1.10**.
+
 ## Strategie
 
 ### Vstup do obchodu

@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Petr Svoboda"
 #property link      "https://github.com/svopex/MT5-Tonda-Strategy"
-#property version   "1.00"
+#property version   "1.10"
 #property description "Order blocky (Svopex SMC) + Bollinger Bands"
 
 #include <Trade/Trade.mqh>
