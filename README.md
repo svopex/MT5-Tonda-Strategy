@@ -11,6 +11,7 @@ a `docs/BollingerBands.pine`.
   z indikátoru Svopex SMC.
 - `MQL5/Experts/TondaStrategy/ChartDrawing.mqh` – kreslení grafu jako v TradingView.
 - `MQL5/Experts/TondaStrategy/ZoneCanvas.mqh` – průhledná bitmapa pro order blocky a výplň BB.
+- `MQL5/Experts/TondaStrategy/TradingHours.mqh` – obchodní doba (otevírání a zavírání obchodů).
 - `scripts/install.ps1` – instalace a kompilace experta ve všech terminálech MT5.
 - `docs/` – zadání strategie a zdrojové Pine skripty.
 
@@ -53,6 +54,15 @@ pozice; dokud trvá, nové signály se ignorují.
 Nákup se zavře, jakmile Bid dosáhne horního (červeného) pásma, prodej po dosažení
 dolního (zeleného) pásma.
 
+### Obchodní doba
+
+Časy jsou podle času serveru brokera (stejně jako svíčky v MT5) a dají se změnit v nastavení:
+
+- nové obchody se otevírají jen od *Začátek obchodování* (výchozí 02:00) do *Konec otevírání
+  obchodů* (výchozí 23:00),
+- v čase *Zavření otevřených obchodů* (výchozí 23:45) se případná otevřená pozice zavře;
+  zavírací doba trvá až do začátku dalšího obchodování, takže se mezitím nic neotevře.
+
 ### Stop loss a velikost pozice
 
 - SL je pod dolní hranou order blocku (nákup) nebo nad horní hranou (prodej)
@@ -77,6 +87,9 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Obchod | Odstup SL od order blocku (body) | 60 | Vzdálenost SL za hranou OB |
 | Obchod | Magic number | 202610225598 | Identifikace pozic experta |
 | Obchod | Maximální skluz (body) | 20 | Povolená odchylka ceny při obchodu |
+| Obchodní doba | Začátek obchodování | 02:00 | Od kdy se otevírají nové obchody (čas serveru, HH:MM) |
+| Obchodní doba | Konec otevírání obchodů | 23:00 | Do kdy se otevírají nové obchody |
+| Obchodní doba | Zavření otevřených obchodů | 23:45 | Kdy se otevřená pozice zavře |
 | Bollinger Bands | Perioda / Směrodatná odchylka | 20 / 2.0 | Parametry BB (SMA z close) |
 | Order blocky | Internal order blocky | ano | Používat internal OB |
 | Order blocky | Swing order blocky | ne | Používat swing OB |
@@ -109,8 +122,8 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
 - EQH/EQL (tečkovaně) a Strong/Weak High a Low,
 - text vlevo nahoře: zda expert může obchodovat (`ZAPNUTO`, nebo `VYPNUTO` s důvodem – např.
   vypnuté Algoritmické obchodování v terminálu nebo ve vlastnostech experta, chybějící připojení,
-  zákaz obchodování na účtu či symbolu) a aktuální tolerance nového OB v bodech
-  (*Tolerance nového OB* × ATR 14).
+  zákaz obchodování na účtu či symbolu; mimo obchodní dobu `ZAPNUTO – mimo obchodní dobu`),
+  nastavená obchodní doba a aktuální tolerance nového OB v bodech (*Tolerance nového OB* × ATR 14).
 
 Vyplněné zóny (order blocky a výplň BB) se kreslí do jedné průhledné bitmapy za svíčkami,
 kde se barvy skládají s průhledností z Pine stejně jako v TradingView – i tam, kde se boxy

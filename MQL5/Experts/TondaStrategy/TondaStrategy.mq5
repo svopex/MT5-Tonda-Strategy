@@ -12,12 +12,18 @@
 #include <Trade/Trade.mqh>
 #include "OrderBlocks.mqh"
 #include "ChartDrawing.mqh"
+#include "TradingHours.mqh"
 
 input group "Obchod"
 input double             InpRiskPercent          = 1.0;           // Riziko na obchod (% zůstatku)
 input int                InpStopLossOffsetPoints = 60;            // Odstup SL od order blocku (body)
 input ulong              InpMagic                = 202610225598;  // Magic number
 input int                InpSlippagePoints       = 20;            // Maximální skluz (body)
+
+input group "Obchodní doba (čas serveru, HH:MM)"
+input string             InpTradeStart           = "02:00";       // Začátek obchodování
+input string             InpTradeEnd             = "23:00";       // Konec otevírání obchodů
+input string             InpCloseTime            = "23:45";       // Zavření otevřených obchodů
 
 input group "Bollinger Bands"
 input int                InpBandsPeriod          = 20;            // Perioda
@@ -46,6 +52,7 @@ input bool               InpShowInfo             = true;          // Text vlevo 
 CTrade              g_trade;
 COrderBlockDetector g_detector;
 CChartDrawing       g_chart;
+CTradingHours       g_hours;
 int                 g_bandsHandle  = INVALID_HANDLE;
 datetime            g_lastBarTime  = 0;   // čas poslední zpracované uzavřené svíčky
 bool                g_infoEnabled  = false; // vypisovat text vlevo nahoře
@@ -58,7 +65,8 @@ int OnInit()
   {
    // Kontrola nastavení, se kterým strategie nedává smysl
    if(InpRiskPercent <= 0.0 || InpStopLossOffsetPoints < 0 || InpMaxBlocks < 1 ||
-      InpInternalLength < 1 || InpSwingLength < 1 || (!InpUseInternalBlocks && !InpUseSwingBlocks))
+      InpInternalLength < 1 || InpSwingLength < 1 || (!InpUseInternalBlocks && !InpUseSwingBlocks) ||
+      !g_hours.Init(InpTradeStart, InpTradeEnd, InpCloseTime))
      {
       Print("Neplatné nastavení vstupních parametrů.");
       return INIT_PARAMETERS_INCORRECT;
@@ -131,6 +139,14 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void OnTick()
   {
+   // Zavírací doba závisí jen na čase: pozice se zavře, i když chybí data svíček nebo BB
+   ulong ticket = FindOpenPosition();
+   if(ticket != 0 && g_hours.IsClosingTime())
+     {
+      ClosePosition(ticket);
+      return;
+     }
+
    // Order blocky se počítají z uzavřených svíček; nové svíčky zpracujeme hned na prvním ticku
    bool newBar = false;
    if(!ProcessClosedBars(newBar))
@@ -143,8 +159,7 @@ void OnTick()
       return;
    g_chart.Refresh(newBar, bands);
 
-   double bid    = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   ulong  ticket = FindOpenPosition();
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
    // Otevřená pozice: výstup po dosažení protějšího pásma, nové vstupy se neotevírají
    if(ticket != 0)
@@ -153,7 +168,8 @@ void OnTick()
       return;
      }
 
-   CheckEntry(bid, bands);
+   if(g_hours.IsEntryTime())
+      CheckEntry(bid, bands);
   }
 
 //+------------------------------------------------------------------+
@@ -165,8 +181,13 @@ void UpdateInfo()
    if(!g_infoEnabled)
       return;
 
+   // Mimo obchodní dobu je expert zapnutý, ale nové obchody neotevírá
    string reason = TradingBlockReason();
-   string status = reason == "" ? "ZAPNUTO – může obchodovat" : "VYPNUTO – " + reason;
+   string status = "ZAPNUTO – může obchodovat";
+   if(reason != "")
+      status = "VYPNUTO – " + reason;
+   else if(!g_hours.IsEntryTime())
+      status = "ZAPNUTO – mimo obchodní dobu, nové obchody neotevírá";
 
    // Tolerance nového OB stejná jako ve strategii, převedená na body symbolu
    double distance  = g_detector.NewBlockTolerance(InpNewBlockTolerance);
@@ -175,7 +196,7 @@ void UpdateInfo()
                         DoubleToString(InpNewBlockTolerance, 2) + " × ATR 14)"
                       : "čeká na data";
 
-   string text = "TondaStrategy: " + status + "\nTolerance nového OB: " + tolerance;
+   string text = "TondaStrategy: " + status + "\nObchodní doba: " + g_hours.Description() + "\nTolerance nového OB: " + tolerance;
    if(text == g_infoText)
       return;
    g_infoText = text;
@@ -274,7 +295,14 @@ void ManagePosition(const ulong ticket, const double bid, const SBandValues &ban
 
    bool isBuy         = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
    bool reachedTarget = isBuy ? bid >= bands.upper : bid <= bands.lower;
-   if(reachedTarget && !g_trade.PositionClose(ticket))
+   if(reachedTarget)
+      ClosePosition(ticket);
+  }
+
+// Zavře pozici tržním příkazem; neúspěch zapíše do logu
+void ClosePosition(const ulong ticket)
+  {
+   if(!g_trade.PositionClose(ticket))
       Print("Pozici ", ticket, " se nepodařilo zavřít: ", g_trade.ResultRetcodeDescription());
   }
 
