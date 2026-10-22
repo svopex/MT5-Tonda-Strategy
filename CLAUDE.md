@@ -7,3 +7,16 @@
   projektu, uprav odpovídající část `README.md` ve stejném commitu.
 - Před commitem zkontroluj, zda `README.md` odpovídá změnám v commitu; pokud úprava není
   potřeba (refaktoring, testy, kosmetika), README neměň.
+
+## Instalace do MetaTrader 5
+
+- Před každou instalací nové verze experta spusť `/simplify` a zapracuj jeho nálezy;
+  do té doby kompiluj jen kopii v pracovní složce (scratchpad), ne v repozitáři.
+- Po každé změně kódu v `MQL5/` spusť instalaci a kompilaci experta:
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1`
+- Skript vytvoří ve všech nalezených terminálech MT5 junction `MQL5\Experts\TondaStrategy`
+  na složku v repozitáři (pokud chybí) a expert zkompiluje.
+- Nepoužívej vlastní indikátory; vše, co se má zobrazit v grafu, kreslí expert sám.
+- Úkol je hotový, až když skript skončí s `Result: 0 errors`; chyby kompilace oprav.
+- Zdrojové soubory MQL5 a `.ps1` ukládej v UTF-8 s BOM (MetaEditor i PowerShell 5.1
+  jinak špatně načtou češtinu).

@@ -1,2 +1,111 @@
 # Tondova obchodni strategie
 
+Automatická obchodní strategie (Expert Advisor) pro MetaTrader 5. Vychází ze zadání
+v `docs/prompt.md` a z indikátorů pro TradingView `docs/SvopexSMC.pine` (order blocky)
+a `docs/BollingerBands.pine`.
+
+## Struktura projektu
+
+- `MQL5/Experts/TondaStrategy/TondaStrategy.mq5` – expert: vstupy, výstupy, velikost pozice.
+- `MQL5/Experts/TondaStrategy/OrderBlocks.mqh` – detekce struktury a order blocků převzatá
+  z indikátoru Svopex SMC.
+- `MQL5/Experts/TondaStrategy/ChartDrawing.mqh` – kreslení grafu jako v TradingView.
+- `scripts/install.ps1` – instalace a kompilace experta ve všech terminálech MT5.
+- `docs/` – zadání strategie a zdrojové Pine skripty.
+
+## Instalace a spuštění
+
+1. Spusťte instalační skript:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+   ```
+
+   Skript najde všechny terminály MT5 (`%APPDATA%\MetaQuotes\Terminal`), v každém vytvoří
+   odkaz (junction) `MQL5\Experts\TondaStrategy` na složku v repozitáři a expert zkompiluje.
+   Změny v repozitáři se tak projeví ve všech terminálech; po úpravě kódu stačí skript
+   spustit znovu (nebo zkompilovat v MetaEditoru klávesou F7).
+2. V MT5 obnovte Navigátor (*Experti → pravé tlačítko → Obnovit*).
+3. Přetáhněte experta na graf, nebo ho spusťte v testeru strategií. Strategie pracuje
+   na časovém rámci grafu.
+
+## Strategie
+
+### Vstup do obchodu
+
+Signál se vyhodnocuje průběžně na každém ticku:
+
+- **Nákup** – cena (Bid) je v dolní polovině Bollinger Bands (mezi dolním zeleným
+  a středním modrým pásmem) a zároveň:
+  - na poslední uzavřené svíčce vznikl nový býčí (modrý) order block a cena je v jeho
+    blízkosti (tolerance = násobek ATR 14), nebo
+  - tvořená svíčka se dotkla býčího order blocku shora, přičemž předchozí svíčka byla celá nad ním.
+- **Prodej** – zrcadlově: cena je v horní polovině BB (mezi středním modrým a horním
+  červeným pásmem) a vznikne nebo se zasáhne medvědí (červený) order block zdola.
+
+Kontroluje se jen několik nejnovějších order blocků (`Počet kontrolovaných nejnovějších OB`).
+Z každého order blocku vzejde nejvýš jeden signál. Současně je otevřená nejvýš jedna
+pozice; dokud trvá, nové signály se ignorují.
+
+### Výstup z obchodu
+
+Nákup se zavře, jakmile Bid dosáhne horního (červeného) pásma, prodej po dosažení
+dolního (zeleného) pásma.
+
+### Stop loss a velikost pozice
+
+- SL je pod dolní hranou order blocku (nákup) nebo nad horní hranou (prodej)
+  plus nastavitelný odstup v bodech (výchozí 60).
+- Objem se počítá tak, aby ztráta při zásahu SL byla nastavené procento zůstatku účtu.
+  Vyjde-li objem pod minimum symbolu, obchod se neotevře.
+
+### Order blocky
+
+Detekce odpovídá indikátoru Svopex SMC (LuxAlgo Smart Money Concepts): order block vzniká
+při prolomení swingu close cenou (BOS/CHoCH) ze svíčky s extrémem mezi swingem a prolomením.
+Velmi volatilní svíčky (rozpětí ≥ 2× ATR 200) se při výběru extrému potlačí. Order block
+zaniká (mitigace), když cena projde za jeho protější hranu. Ve výchozím stavu se používají
+internal order blocky (délka struktury 5), swing order blocky (délka 50) lze zapnout.
+Order blocky se počítají z uzavřených svíček; při startu se zpracuje nastavený počet svíček historie.
+
+## Nastavení
+
+| Skupina | Parametr | Výchozí | Popis |
+|---|---|---|---|
+| Obchod | Riziko na obchod (% zůstatku) | 1.0 | Ztráta při zásahu SL v % zůstatku |
+| Obchod | Odstup SL od order blocku (body) | 60 | Vzdálenost SL za hranou OB |
+| Obchod | Magic number | 202610225598 | Identifikace pozic experta |
+| Obchod | Maximální skluz (body) | 20 | Povolená odchylka ceny při obchodu |
+| Bollinger Bands | Perioda / Směrodatná odchylka | 20 / 2.0 | Parametry BB (SMA z close) |
+| Order blocky | Internal order blocky | ano | Používat internal OB |
+| Order blocky | Swing order blocky | ne | Používat swing OB |
+| Order blocky | Délka internal / swing struktury | 5 / 50 | Počet svíček pro potvrzení swingu |
+| Order blocky | Mitigace order blocku | High/Low | Cena, která OB zneplatní (High/Low nebo Close) |
+| Order blocky | Počet kontrolovaných nejnovějších OB | 5 | Kolik nejnovějších OB se kontroluje |
+| Order blocky | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
+| Order blocky | Počet svíček historie pro rozběh | 2000 | Historie zpracovaná při startu |
+| Zobrazení | Kreslit graf jako v TradingView | ano | Bollinger Bands a Svopex SMC kreslené expertem |
+| Zobrazení | Nastavit barvy grafu jako v TradingView | ano | Tmavé pozadí a barvy svíček (po odebrání experta se vrátí) |
+| Zobrazení | Mitigované order blocky | ano | Zneplatněné OB končící na svíčce mitigace |
+| Zobrazení | Internal / swing struktura (BOS/CHoCH) | ano / ano | Čáry a popisky prolomení struktury |
+| Zobrazení | Equal High/Low | ano | Čáry a popisky EQH/EQL |
+| Zobrazení | Strong/Weak High/Low | ano | Poslední swing high a low s popiskem |
+| Zobrazení | Počet svíček s Bollinger Bands | 500 | Kolik posledních svíček má nakreslené BB |
+
+## Zobrazení v grafu
+
+Expert sám kreslí graf tak, aby vypadal jako TradingView s indikátory `BollingerBands.pine`
+a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kvůli rychlosti nekreslí):
+
+- tmavé pozadí `#0C0C0C`, zelené a červené svíčky bez mřížky,
+- Bollinger Bands: modrý střed, červené horní a zelené dolní pásmo, výplň mezi pásmy,
+- aktivní order blocky sahající doprava (počet podle *Počet kontrolovaných nejnovějších OB*),
+- 5 nejnovějších mitigovaných order blocků (box končí na svíčce mitigace, tečkovaný okraj),
+- internal BOS/CHoCH (čárkovaně) a swing BOS/CHoCH (plně) s popisky,
+- EQH/EQL (tečkovaně) a Strong/Weak High a Low.
+
+Vše je kreslené grafickými objekty. MT5 nemá u objektů průhlednost, proto se barvy
+s průhledností z Pine předem smíchají s pozadím; vypadají stejně, jen se překrývající boxy
+neprolínají. Struktura se počítá z uzavřených svíček, takže BOS/CHoCH a nové OB se objeví až
+po uzavření svíčky (TradingView je kreslí už během svíčky). Rozdíly mohou vzniknout
+i z odlišných cenových dat brokera.
