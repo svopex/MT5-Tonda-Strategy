@@ -109,7 +109,7 @@ struct SOrderBlock
    double            high;          // horní hrana (u volatilní svíčky prohozená s low, jako v Pine)
    double            low;           // dolní hrana
    datetime          time;          // čas svíčky order blocku
-   int               bias;          // OB_BULLISH (modrý) nebo OB_BEARISH (červený)
+   int               bias;          // OB_BULLISH (býčí, long) nebo OB_BEARISH (medvědí, short)
    int               createdBar;    // index svíčky, na které OB vznikl
    bool              used;          // z OB už vzešel signál
    datetime          mitigatedTime; // čas svíčky, která OB zneplatnila (0 = aktivní)

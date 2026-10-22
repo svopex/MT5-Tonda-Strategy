@@ -35,7 +35,6 @@ input int                InpHistoryBars          = 2000;          // Počet sví
 
 input group "Zobrazení"
 input bool               InpShowChart            = true;          // Kreslit graf jako v TradingView
-input bool               InpApplyChartColors     = true;          // Nastavit barvy grafu jako v TradingView
 input bool               InpShowMitigatedBlocks  = true;          // Mitigované order blocky
 input bool               InpShowInternalStructure = true;         // Internal struktura (BOS/CHoCH)
 input bool               InpShowSwingStructure   = true;          // Swing struktura (BOS/CHoCH)
@@ -73,7 +72,6 @@ int OnInit()
    // Kreslení grafu; zda se v testeru opravdu kreslí, rozhodne CChartDrawing sám
    SChartDrawingSettings settings;
    settings.enabled               = InpShowChart;
-   settings.applyChartColors      = InpApplyChartColors;
    settings.blocksCount           = InpMaxBlocks;
    settings.showMitigatedBlocks   = InpShowMitigatedBlocks;
    settings.showInternalStructure = InpShowInternalStructure;
@@ -209,9 +207,9 @@ void ManagePosition(const ulong ticket, const double bid, const SBandValues &ban
   }
 
 //+------------------------------------------------------------------+
-//| Vyhodnotí vstup: nákup u modrého OB v dolní polovině BB          |
-//| (mezi zeleným a modrým pásmem), prodej u červeného OB v horní    |
-//| polovině BB (mezi modrým a červeným pásmem).                     |
+//| Vyhodnotí vstup: nákup u býčího OB v dolní polovině BB           |
+//| (mezi dolním a středním pásmem), prodej u medvědího OB v horní   |
+//| polovině BB (mezi středním a horním pásmem).                     |
 //+------------------------------------------------------------------+
 void CheckEntry(const double bid, const SBandValues &bands)
   {

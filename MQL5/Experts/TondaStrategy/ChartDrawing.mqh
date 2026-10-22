@@ -1,7 +1,7 @@
 ﻿//+------------------------------------------------------------------+
 //|                                                 ChartDrawing.mqh |
 //| Kreslení grafu jako v TradingView přímo z experta: Bollinger     |
-//| Bands s výplní (docs/BollingerBands.pine) a Svopex SMC           |
+//| Bands (docs/BollingerBands.pine) a Svopex SMC                    |
 //| (docs/SvopexSMC.pine) – order blocky, BOS/CHoCH, EQH/EQL         |
 //| a Strong/Weak High/Low.                                          |
 //+------------------------------------------------------------------+
@@ -26,16 +26,14 @@
 #define COLOR_BULLISH           C'8,153,129'
 #define COLOR_BEARISH           C'242,54,69'
 #define COLOR_BANDS_BASIS       C'41,98,255'
-#define COLOR_BANDS_FILL        C'33,150,243'
 #define COLOR_INTERNAL_BULLISH  C'49,121,245'
-#define COLOR_INTERNAL_BEARISH  C'247,124,128'
 #define COLOR_SWING_BULLISH     C'24,72,204'
-#define COLOR_SWING_BEARISH     C'178,40,51'
-#define COLOR_MITIGATED_BULLISH C'120,123,134'
-#define COLOR_MITIGATED_BEARISH C'158,107,112'
+// Medvědí (short) OB, internal i swing, jsou na přání zelené místo červených z Pine
+#define COLOR_BLOCK_BEARISH     COLOR_BULLISH
+// Mitigované OB mají jednu šedou pro oba směry
+#define COLOR_MITIGATED         C'120,123,134'
 
 // Průhlednosti barev z Pine (0 = neprůhledná, 100 = neviditelná)
-#define BANDS_FILL_TRANSPARENCY       95
 #define BLOCK_TRANSPARENCY            80
 #define MITIGATED_TRANSPARENCY        85
 #define MITIGATED_BORDER_TRANSPARENCY 50
@@ -69,7 +67,6 @@ struct SBandValues
 struct SChartDrawingSettings
   {
    bool              enabled;
-   bool              applyChartColors;
    int               blocksCount;
    bool              showMitigatedBlocks;
    bool              showInternalStructure;
@@ -89,9 +86,8 @@ private:
    SChartDrawingSettings m_settings;
    bool              m_enabled;
    int               m_bandsHandle;
-   color             m_background;      // pozadí grafu pro míchání průhledných barev
    int               m_eventCount;      // počet vykreslených událostí struktury
-   long              m_savedColors[];   // původní hodnoty THEME_PROPERTIES (prázdné = motiv nepoužit)
+   long              m_savedColors[];   // původní hodnoty THEME_PROPERTIES
    datetime          m_currentSegment;  // začátek úseku BB končícího na tvořené svíčce (0 = BB ještě nejsou)
    datetime          m_oldestSegment;   // začátek nejstaršího nakresleného úseku BB
 
@@ -110,9 +106,7 @@ public:
       m_currentSegment = 0;
       m_oldestSegment  = 0;
       Clear();
-      if(m_settings.applyChartColors)
-         ApplyChartColors();
-      m_background = (color)ChartGetInteger(0, CHART_COLOR_BACKGROUND);
+      ApplyChartColors();
      }
 
    // Smaže všechny objekty a vrátí původní barvy grafu
@@ -145,8 +139,6 @@ public:
       if(!SyncBands())
          return;
       DrawEvents(detector);
-
-      // Zóny se překreslují až po BB, aby ležely nad výplní pásma
       DrawZones(detector);
       ChartRedraw();
      }
@@ -163,7 +155,7 @@ private:
       int    result = 0;
       for(int shift = 0; shift <= 16; shift += 8)
         {
-         int channel = (int)MathRound(alpha * ((value >> shift) & 0xFF) + (1.0 - alpha) * ((m_background >> shift) & 0xFF));
+         int channel = (int)MathRound(alpha * ((value >> shift) & 0xFF) + (1.0 - alpha) * ((COLOR_BACKGROUND >> shift) & 0xFF));
          result |= channel << shift;
         }
       return (color)result;
@@ -290,8 +282,10 @@ private:
      }
 
    //+---------------------------------------------------------------+
-   //| Nakreslí jeden úsek BB: výplň ze dvou trojúhelníků a linie    |
-   //| pásem. Úseky bez hodnoty (před první periodou) se vynechají.  |
+   //| Nakreslí jeden úsek linií BB. Výplň mezi pásmy se nekreslí:   |
+   //| MT5 míchá překrývající se vyplněné objekty přes XOR a OB      |
+   //| uvnitř pásma by měnily barvu. Úseky bez hodnoty (před první   |
+   //| periodou) se vynechají.                                       |
    //+---------------------------------------------------------------+
    void              CreateSegment(const datetime t1, const double basis1, const double upper1, const double lower1,
                                    const datetime t2, const double basis2, const double upper2, const double lower2)
@@ -299,9 +293,6 @@ private:
       if(basis1 == EMPTY_VALUE || basis1 == 0.0)
          return;
       string name = BANDS_PREFIX + IntegerToString((long)t1);
-      color  fill = Blend(COLOR_BANDS_FILL, BANDS_FILL_TRANSPARENCY);
-      CreateTriangle(name + "F1", t1, upper1, t2, upper2, t2, lower2, fill);
-      CreateTriangle(name + "F2", t1, upper1, t2, lower2, t1, lower1, fill);
       CreateLine(name + "B", t1, basis1, t2, basis2, COLOR_BANDS_BASIS, STYLE_SOLID, true);
       CreateLine(name + "U", t1, upper1, t2, upper2, COLOR_BEARISH, STYLE_SOLID, true);
       CreateLine(name + "L", t1, lower1, t2, lower2, COLOR_BULLISH, STYLE_SOLID, true);
@@ -317,15 +308,12 @@ private:
       ObjectSetDouble(0, name + "B", OBJPROP_PRICE, 1, current.basis);
       ObjectSetDouble(0, name + "U", OBJPROP_PRICE, 1, current.upper);
       ObjectSetDouble(0, name + "L", OBJPROP_PRICE, 1, current.lower);
-      ObjectSetDouble(0, name + "F1", OBJPROP_PRICE, 1, current.upper);
-      ObjectSetDouble(0, name + "F1", OBJPROP_PRICE, 2, current.lower);
-      ObjectSetDouble(0, name + "F2", OBJPROP_PRICE, 1, current.lower);
      }
 
    void              DeleteSegment(const datetime startTime)
      {
       string name = BANDS_PREFIX + IntegerToString((long)startTime);
-      string parts[] = {"F1", "F2", "B", "U", "L"};
+      string parts[] = {"B", "U", "L"};
       for(int i = 0; i < ArraySize(parts); i++)
          ObjectDelete(0, name + parts[i]);
      }
@@ -367,14 +355,11 @@ private:
 
       for(int i = 0; i < total; i++)
         {
-         bool  bullish = blocks[i].bias == OB_BULLISH;
-         color base;
-         if(mitigated)
-            base = bullish ? COLOR_MITIGATED_BULLISH : COLOR_MITIGATED_BEARISH;
-         else if(internal)
-            base = bullish ? COLOR_INTERNAL_BULLISH : COLOR_INTERNAL_BEARISH;
-         else
-            base = bullish ? COLOR_SWING_BULLISH : COLOR_SWING_BEARISH;
+         // Internal a swing se barvou liší jen u býčích OB
+         color base = mitigated                      ? COLOR_MITIGATED
+                      : blocks[i].bias != OB_BULLISH ? COLOR_BLOCK_BEARISH
+                      : internal                     ? COLOR_INTERNAL_BULLISH
+                                                     : COLOR_SWING_BULLISH;
 
          datetime right = mitigated ? blocks[i].mitigatedTime : farRight;
          string   name  = prefix + IntegerToString(i);
@@ -434,16 +419,6 @@ private:
       SetCommon(name, lineColor, back);
       ObjectSetInteger(0, name, OBJPROP_STYLE, style);
       ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
-     }
-
-   void              CreateTriangle(const string name, const datetime time1, const double price1,
-                                    const datetime time2, const double price2,
-                                    const datetime time3, const double price3, const color fillColor)
-     {
-      if(!ObjectCreate(0, name, OBJ_TRIANGLE, 0, time1, price1, time2, price2, time3, price3))
-         return;
-      SetCommon(name, fillColor, true);
-      ObjectSetInteger(0, name, OBJPROP_FILL, true);
      }
 
    // anchor – ANCHOR_LOWER = text nad bodem, ANCHOR_UPPER = text pod bodem

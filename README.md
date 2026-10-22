@@ -37,11 +37,11 @@ Signál se vyhodnocuje průběžně na každém ticku:
 
 - **Nákup** – cena (Bid) je v dolní polovině Bollinger Bands (mezi dolním zeleným
   a středním modrým pásmem) a zároveň:
-  - na poslední uzavřené svíčce vznikl nový býčí (modrý) order block a cena je v jeho
+  - na poslední uzavřené svíčce vznikl nový býčí order block a cena je v jeho
     blízkosti (tolerance = násobek ATR 14), nebo
   - tvořená svíčka se dotkla býčího order blocku shora, přičemž předchozí svíčka byla celá nad ním.
 - **Prodej** – zrcadlově: cena je v horní polovině BB (mezi středním modrým a horním
-  červeným pásmem) a vznikne nebo se zasáhne medvědí (červený) order block zdola.
+  červeným pásmem) a vznikne nebo se zasáhne medvědí order block zdola.
 
 Kontroluje se jen několik nejnovějších order blocků (`Počet kontrolovaných nejnovějších OB`).
 Z každého order blocku vzejde nejvýš jeden signál. Současně je otevřená nejvýš jedna
@@ -85,7 +85,6 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Order blocky | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
 | Order blocky | Počet svíček historie pro rozběh | 2000 | Historie zpracovaná při startu |
 | Zobrazení | Kreslit graf jako v TradingView | ano | Bollinger Bands a Svopex SMC kreslené expertem |
-| Zobrazení | Nastavit barvy grafu jako v TradingView | ano | Tmavé pozadí a barvy svíček (po odebrání experta se vrátí) |
 | Zobrazení | Mitigované order blocky | ano | Zneplatněné OB končící na svíčce mitigace |
 | Zobrazení | Internal / swing struktura (BOS/CHoCH) | ano / ano | Čáry a popisky prolomení struktury |
 | Zobrazení | Equal High/Low | ano | Čáry a popisky EQH/EQL |
@@ -97,15 +96,19 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 Expert sám kreslí graf tak, aby vypadal jako TradingView s indikátory `BollingerBands.pine`
 a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kvůli rychlosti nekreslí):
 
-- tmavé pozadí `#0C0C0C`, zelené a červené svíčky bez mřížky,
-- Bollinger Bands: modrý střed, červené horní a zelené dolní pásmo, výplň mezi pásmy,
-- aktivní order blocky sahající doprava (počet podle *Počet kontrolovaných nejnovějších OB*),
-- 5 nejnovějších mitigovaných order blocků (box končí na svíčce mitigace, tečkovaný okraj),
+- tmavé pozadí `#0C0C0C`, zelené a červené svíčky bez mřížky (nastaví se vždy, při kreslení
+  grafu; po odebrání experta se původní barvy vrátí),
+- Bollinger Bands: modrý střed, červené horní a zelené dolní pásmo (bez výplně mezi pásmy –
+  MT5 míchá překrývající se vyplněné objekty přes XOR a order blocky uvnitř pásma by měnily barvu),
+- aktivní order blocky sahající doprava (počet podle *Počet kontrolovaných nejnovějších OB*);
+  býčí (long) jsou modré, medvědí (short) zelené – na rozdíl od červených v Pine,
+- 5 nejnovějších mitigovaných order blocků v šedé barvě pro oba směry (box končí na svíčce
+  mitigace, tečkovaný okraj),
 - internal BOS/CHoCH (čárkovaně) a swing BOS/CHoCH (plně) s popisky,
 - EQH/EQL (tečkovaně) a Strong/Weak High a Low.
 
 Vše je kreslené grafickými objekty. MT5 nemá u objektů průhlednost, proto se barvy
-s průhledností z Pine předem smíchají s pozadím; vypadají stejně, jen se překrývající boxy
-neprolínají. Struktura se počítá z uzavřených svíček, takže BOS/CHoCH a nové OB se objeví až
+s průhledností z Pine předem smíchají s pozadím; vypadají stejně, jen průnik dvou
+překrývajících se boxů má jinou barvu. Struktura se počítá z uzavřených svíček, takže BOS/CHoCH a nové OB se objeví až
 po uzavření svíčky (TradingView je kreslí už během svíčky). Rozdíly mohou vzniknout
 i z odlišných cenových dat brokera.
