@@ -34,7 +34,7 @@ a `docs/BollingerBands.pine`.
 ## Verzování
 
 Expert se pravidelně verzuje. Při každé změně, která se nasazuje do MT5, se zvýší verze
-v `#property version` v `MQL5/Experts/TondaStrategy/TondaStrategy.mq5` (formát `X.YY`,
+v `#define EA_VERSION` v `MQL5/Experts/TondaStrategy/TondaStrategy.mq5` (formát `X.YY`,
 MT5 ji ukazuje ve vlastnostech experta):
 
 - oprava nebo drobná úprava: `+0.01` (např. 1.10 → 1.11),
@@ -43,7 +43,7 @@ MT5 ji ukazuje ve vlastnostech experta):
 
 Commit s novou verzí se označí git tagem `vX.YY` (např. `v1.10`) a tag se pushne spolu s commitem.
 
-Aktuální verze: **1.10**.
+Aktuální verze: **1.11** (vypisuje se i v textu vlevo nahoře, např. `TondaStrategy 1.11: ZAPNUTO …`).
 
 ## Strategie
 
@@ -156,7 +156,7 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
   mitigace, tečkovaný okraj),
 - internal BOS/CHoCH (čárkovaně) a swing BOS/CHoCH (plně) s popisky,
 - EQH/EQL (tečkovaně) a Strong/Weak High a Low,
-- text vlevo nahoře: zda expert může obchodovat (`ZAPNUTO`, nebo `VYPNUTO` s důvodem – např.
+- text vlevo nahoře: verze experta, zda expert může obchodovat (`ZAPNUTO`, nebo `VYPNUTO` s důvodem – např.
   vypnuté Algoritmické obchodování v terminálu nebo ve vlastnostech experta, chybějící připojení,
   zákaz obchodování na účtu či symbolu; mimo obchodní dobu `ZAPNUTO – mimo obchodní dobu`),
   obchodní doba (v režimu seancí aktuální seance a z ní odvozené časy otevírání a zavření)

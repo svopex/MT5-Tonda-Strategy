@@ -6,7 +6,9 @@
 //+------------------------------------------------------------------+
 #property copyright "Petr Svoboda"
 #property link      "https://github.com/svopex/MT5-Tonda-Strategy"
-#property version   "1.10"
+// Verze experta: vlastnosti experta v MT5 i text vlevo nahoře
+#define EA_VERSION "1.11"
+#property version   EA_VERSION
 #property description "Order blocky (Svopex SMC) + Bollinger Bands"
 
 #include <Trade/Trade.mqh>
@@ -213,7 +215,7 @@ void UpdateInfo()
 
    // Vzdálenosti stejné jako ve strategii, převedené na body symbolu
    string earlyExit = InpEarlyExitAtr > 0.0 ? AtrPointsText(InpEarlyExitAtr) + " před pásmem" : "vypnutý (výstup na pásmu)";
-   string text = "TondaStrategy: " + status +
+   string text = "TondaStrategy " + EA_VERSION + ": " + status +
                  "\nObchodní doba: " + g_hours.Description() +
                  "\nTolerance nového OB: " + AtrPointsText(InpNewBlockTolerance) +
                  "\nPředčasný výstup: " + earlyExit +
