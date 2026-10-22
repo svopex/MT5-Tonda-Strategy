@@ -28,11 +28,17 @@ input double             InpStopLossSpreadMultiple = 1.25;        // Odstup SL �
 input int                InpStopLossOffsetPoints = 60;            // Odstup SL – pevně (body)
 input ulong              InpMagic                = 202610225598;  // Magic number
 input double             InpSlippageAtr          = 0.15;          // Maximální skluz (násobek ATR 14)
+input double             InpNewBlockTolerance    = 0.5;           // Tolerance nového OB (násobek ATR 14)
+input double             InpEarlyExitAtr         = 0.5;           // Předčasný výstup před pásmem BB (násobek ATR 14, 0 = na pásmu)
 
-input group "Obchodní doba (čas serveru, HH:MM)"
-input string             InpTradeStart           = "02:00";       // Začátek obchodování
-input string             InpTradeEnd             = "23:00";       // Konec otevírání obchodů
-input string             InpCloseTime            = "23:45";       // Zavření otevřených obchodů
+input group "Obchodní doba (čas serveru)"
+input ENUM_HOURS_SOURCE  InpHoursSource          = HOURS_MANUAL;  // Zdroj obchodní doby
+input string             InpTradeStart           = "02:00";       // Ručně: začátek obchodování (HH:MM)
+input string             InpTradeEnd             = "23:00";       // Ručně: konec otevírání obchodů (HH:MM)
+input string             InpCloseTime            = "23:45";       // Ručně: zavření otevřených obchodů (HH:MM)
+input int                InpSessionOpenDelay     = 60;            // Seance: otevírat až po (min od začátku seance)
+input int                InpSessionEntryStop     = 60;            // Seance: neotevírat (min před koncem seance)
+input int                InpSessionCloseBefore   = 10;            // Seance: zavřít pozice (min před koncem seance)
 
 input group "Bollinger Bands"
 input int                InpBandsPeriod          = 20;            // Perioda
@@ -45,8 +51,6 @@ input int                InpInternalLength       = 5;             // Délka inte
 input int                InpSwingLength          = 50;            // Délka swing struktury
 input ENUM_OB_MITIGATION InpMitigation           = OB_MITIGATION_HIGHLOW; // Mitigace order blocku
 input int                InpMaxBlocks            = 5;             // Počet kontrolovaných nejnovějších OB
-input double             InpNewBlockTolerance    = 0.5;           // Tolerance nového OB (násobek ATR 14)
-input double             InpEarlyExitAtr         = 0.5;           // Předčasný výstup před pásmem BB (násobek ATR 14, 0 = na pásmu)
 input int                InpHistoryBars          = 2000;          // Počet svíček historie pro rozběh
 
 input group "Zobrazení"
@@ -77,7 +81,7 @@ int OnInit()
    if(InpRiskPercent <= 0.0 || InpStopLossOffsetPoints < 0 || InpStopLossSpreadMultiple < 0.0 ||
       InpSlippageAtr < 0.0 || InpMaxBlocks < 1 || InpEarlyExitAtr < 0.0 ||
       InpInternalLength < 1 || InpSwingLength < 1 || (!InpUseInternalBlocks && !InpUseSwingBlocks) ||
-      !g_hours.Init(InpTradeStart, InpTradeEnd, InpCloseTime))
+      !InitTradingHours())
      {
       Print("Neplatné nastavení vstupních parametrů.");
       return INIT_PARAMETERS_INCORRECT;
@@ -116,6 +120,14 @@ int OnInit()
    g_infoText = "";
    UpdateInfo();
    return INIT_SUCCEEDED;
+  }
+
+// Nastaví obchodní dobu podle zvoleného zdroje; false při neplatných časech nebo odstupech
+bool InitTradingHours()
+  {
+   if(InpHoursSource == HOURS_SESSIONS)
+      return g_hours.InitSessions(_Symbol, InpSessionOpenDelay, InpSessionEntryStop, InpSessionCloseBefore);
+   return g_hours.InitManual(InpTradeStart, InpTradeEnd, InpCloseTime);
   }
 
 //+------------------------------------------------------------------+

@@ -57,12 +57,22 @@ o tuto vzdálenost dřív; aktuální hodnota v bodech je vidět v textu vlevo n
 
 ### Obchodní doba
 
-Časy jsou podle času serveru brokera (stejně jako svíčky v MT5) a dají se změnit v nastavení:
+Časy jsou podle času serveru brokera (stejně jako svíčky v MT5). Volba *Zdroj obchodní doby*
+určuje, odkud se berou:
 
-- nové obchody se otevírají jen od *Začátek obchodování* (výchozí 02:00) do *Konec otevírání
-  obchodů* (výchozí 23:00),
-- v čase *Zavření otevřených obchodů* (výchozí 23:45) se případná otevřená pozice zavře;
-  zavírací doba trvá až do začátku dalšího obchodování, takže se mezitím nic neotevře.
+- **Ručně** (výchozí):
+  - nové obchody se otevírají jen od *Začátek obchodování* (výchozí 02:00) do *Konec otevírání
+    obchodů* (výchozí 23:00),
+  - v čase *Zavření otevřených obchodů* (výchozí 23:45) se případná otevřená pozice zavře;
+    zavírací doba trvá až do začátku dalšího obchodování, takže se mezitím nic neotevře.
+- **Podle obchodních seancí symbolu v MT5** (ze *Specifikace* symbolu, pro každý den v týdnu):
+  - nové obchody se otevírají až 60 minut po začátku seance a přestanou 60 minut před jejím
+    koncem (*Seance: otevírat až po* / *Seance: neotevírat*),
+  - otevřená pozice se zavře 10 minut před koncem seance (*Seance: zavřít pozice*), tedy i před
+    denní přestávkou,
+  - navazující seance (i přes půlnoc) se berou jako jedna; symbol obchodovaný nepřetržitě
+    se nezavírá,
+  - svátky a zkrácené obchodování MT5 v seancích nemá, ty se nezohlední.
 
 ### Stop loss a velikost pozice
 
@@ -94,17 +104,21 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Obchod | Odstup SL – pevně (body) | 60 | Odstup SL v bodech, je-li zvolen pevný počet bodů |
 | Obchod | Magic number | 202610225598 | Identifikace pozic experta |
 | Obchod | Maximální skluz (násobek ATR 14) | 0.15 | Povolená odchylka ceny při obchodu |
-| Obchodní doba | Začátek obchodování | 02:00 | Od kdy se otevírají nové obchody (čas serveru, HH:MM) |
-| Obchodní doba | Konec otevírání obchodů | 23:00 | Do kdy se otevírají nové obchody |
-| Obchodní doba | Zavření otevřených obchodů | 23:45 | Kdy se otevřená pozice zavře |
+| Obchod | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
+| Obchod | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.5 | O kolik dřív se pozice zavře (0 = na pásmu) |
+| Obchodní doba | Zdroj obchodní doby | Ručně | Ručně zadané časy, nebo obchodní seance symbolu v MT5 |
+| Obchodní doba | Ručně: začátek obchodování | 02:00 | Od kdy se otevírají nové obchody (čas serveru, HH:MM) |
+| Obchodní doba | Ručně: konec otevírání obchodů | 23:00 | Do kdy se otevírají nové obchody |
+| Obchodní doba | Ručně: zavření otevřených obchodů | 23:45 | Kdy se otevřená pozice zavře |
+| Obchodní doba | Seance: otevírat až po (min) | 60 | Odstup nových obchodů od začátku seance |
+| Obchodní doba | Seance: neotevírat (min před koncem) | 60 | Kdy před koncem seance se přestanou otevírat obchody |
+| Obchodní doba | Seance: zavřít pozice (min před koncem) | 10 | Kdy před koncem seance se otevřená pozice zavře |
 | Bollinger Bands | Perioda / Směrodatná odchylka | 20 / 2.0 | Parametry BB (SMA z close) |
 | Order blocky | Internal order blocky | ano | Používat internal OB |
 | Order blocky | Swing order blocky | ne | Používat swing OB |
 | Order blocky | Délka internal / swing struktury | 5 / 50 | Počet svíček pro potvrzení swingu |
 | Order blocky | Mitigace order blocku | High/Low | Cena, která OB zneplatní (High/Low nebo Close) |
 | Order blocky | Počet kontrolovaných nejnovějších OB | 5 | Kolik nejnovějších OB se kontroluje |
-| Order blocky | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
-| Order blocky | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.5 | O kolik dřív se pozice zavře (0 = na pásmu) |
 | Order blocky | Počet svíček historie pro rozběh | 2000 | Historie zpracovaná při startu |
 | Zobrazení | Kreslit graf jako v TradingView | ano | Bollinger Bands a Svopex SMC kreslené expertem |
 | Zobrazení | Mitigované order blocky | ano | Zneplatněné OB končící na svíčce mitigace |
@@ -131,7 +145,8 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
 - text vlevo nahoře: zda expert může obchodovat (`ZAPNUTO`, nebo `VYPNUTO` s důvodem – např.
   vypnuté Algoritmické obchodování v terminálu nebo ve vlastnostech experta, chybějící připojení,
   zákaz obchodování na účtu či symbolu; mimo obchodní dobu `ZAPNUTO – mimo obchodní dobu`),
-  nastavená obchodní doba a aktuální hodnoty v bodech: tolerance nového OB, předčasný výstup,
+  obchodní doba (v režimu seancí aktuální seance a z ní odvozené časy otevírání a zavření)
+  a aktuální hodnoty v bodech: tolerance nového OB, předčasný výstup,
   odstup SL a maximální skluz.
 
 Vyplněné zóny (order blocky a výplň BB) se kreslí do jedné průhledné bitmapy za svíčkami,
