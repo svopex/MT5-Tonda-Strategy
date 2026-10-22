@@ -37,6 +37,7 @@ input int                InpSwingLength          = 50;            // Délka swin
 input ENUM_OB_MITIGATION InpMitigation           = OB_MITIGATION_HIGHLOW; // Mitigace order blocku
 input int                InpMaxBlocks            = 5;             // Počet kontrolovaných nejnovějších OB
 input double             InpNewBlockTolerance    = 0.5;           // Tolerance nového OB (násobek ATR 14)
+input double             InpEarlyExitAtr         = 0.3;           // Předčasný výstup před pásmem BB (násobek ATR 14, 0 = na pásmu)
 input int                InpHistoryBars          = 2000;          // Počet svíček historie pro rozběh
 
 input group "Zobrazení"
@@ -64,7 +65,7 @@ string              g_infoText     = "";  // naposledy vypsaný text vlevo naho�
 int OnInit()
   {
    // Kontrola nastavení, se kterým strategie nedává smysl
-   if(InpRiskPercent <= 0.0 || InpStopLossOffsetPoints < 0 || InpMaxBlocks < 1 ||
+   if(InpRiskPercent <= 0.0 || InpStopLossOffsetPoints < 0 || InpMaxBlocks < 1 || InpEarlyExitAtr < 0.0 ||
       InpInternalLength < 1 || InpSwingLength < 1 || (!InpUseInternalBlocks && !InpUseSwingBlocks) ||
       !g_hours.Init(InpTradeStart, InpTradeEnd, InpCloseTime))
      {
@@ -189,18 +190,25 @@ void UpdateInfo()
    else if(!g_hours.IsEntryTime())
       status = "ZAPNUTO – mimo obchodní dobu, nové obchody neotevírá";
 
-   // Tolerance nového OB stejná jako ve strategii, převedená na body symbolu
-   double distance  = g_detector.NewBlockTolerance(InpNewBlockTolerance);
-   string tolerance = distance > 0.0
-                      ? IntegerToString((int)MathRound(distance / _Point)) + " bodů (" +
-                        DoubleToString(InpNewBlockTolerance, 2) + " × ATR 14)"
-                      : "čeká na data";
-
-   string text = "TondaStrategy: " + status + "\nObchodní doba: " + g_hours.Description() + "\nTolerance nového OB: " + tolerance;
+   // Vzdálenosti stejné jako ve strategii, převedené na body symbolu
+   string earlyExit = InpEarlyExitAtr > 0.0 ? AtrPointsText(InpEarlyExitAtr) + " před pásmem" : "vypnutý (výstup na pásmu)";
+   string text = "TondaStrategy: " + status +
+                 "\nObchodní doba: " + g_hours.Description() +
+                 "\nTolerance nového OB: " + AtrPointsText(InpNewBlockTolerance) +
+                 "\nPředčasný výstup: " + earlyExit;
    if(text == g_infoText)
       return;
    g_infoText = text;
    Comment(text);
+  }
+
+// Násobek ATR(14) jako text v bodech symbolu, např. "87 bodů (0.50 × ATR 14)"
+string AtrPointsText(const double multiple)
+  {
+   double distance = g_detector.AtrDistance(multiple);
+   if(distance <= 0.0)
+      return "čeká na data";
+   return IntegerToString((int)MathRound(distance / _Point)) + " bodů (" + DoubleToString(multiple, 2) + " × ATR " + IntegerToString(ATR_DISTANCE_LENGTH) + ")";
   }
 
 //+------------------------------------------------------------------+
@@ -285,16 +293,18 @@ ulong FindOpenPosition()
   }
 
 //+------------------------------------------------------------------+
-//| Zavře pozici po dosažení protějšího pásma BB                     |
-//| (nákup na horním červeném, prodej na dolním zeleném)             |
+//| Zavře pozici po dosažení protějšího pásma BB (nákup na horním    |
+//| červeném, prodej na dolním zeleném), případně o předčasný výstup |
+//| (násobek ATR 14) dříve                                           |
 //+------------------------------------------------------------------+
 void ManagePosition(const ulong ticket, const double bid, const SBandValues &bands)
   {
    if(!PositionSelectByTicket(ticket))
       return;
 
-   bool isBuy         = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
-   bool reachedTarget = isBuy ? bid >= bands.upper : bid <= bands.lower;
+   bool   isBuy         = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
+   double earlyExit     = g_detector.AtrDistance(InpEarlyExitAtr);
+   bool   reachedTarget = isBuy ? bid >= bands.upper - earlyExit : bid <= bands.lower + earlyExit;
    if(reachedTarget)
       ClosePosition(ticket);
   }

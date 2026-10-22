@@ -37,10 +37,10 @@
 #define COLOR_BEARISH           C'242,54,69'
 #define COLOR_BANDS_BASIS       C'41,98,255'
 #define COLOR_BANDS_FILL        C'33,150,243'
-#define COLOR_INTERNAL_BULLISH  C'49,121,245'
-#define COLOR_SWING_BULLISH     C'24,72,204'
-// Medvědí (short) OB, internal i swing, jsou na přání zelené místo červených z Pine
-#define COLOR_BLOCK_BEARISH     COLOR_BULLISH
+// Order blocky (internal i swing) na přání: long zelené, short červené, v tmavších odstínech než svíčky
+// (zelená je 75 % barvy svíčky, červená je #b22833 z Pine)
+#define COLOR_BLOCK_BULLISH     C'6,115,97'
+#define COLOR_BLOCK_BEARISH     C'178,40,51'
 // Mitigované OB mají jednu šedou pro oba směry
 #define COLOR_MITIGATED         C'120,123,134'
 
@@ -407,20 +407,19 @@ private:
 
    //+---------------------------------------------------------------+
    //| Vykreslí nejvýše count nejnovějších OB ze seznamu do bitmapy. |
-   //| internal – barva internal/swing OB, mitigated – zneplatněné   |
-   //| OB (box končí na svíčce mitigace, tečkovaný okraj); aktivní   |
-   //| OB sahají k pravému okraji grafu (extend.right v Pine)        |
+   //| internal – internal OB bez okraje, swing OB s plným okrajem;  |
+   //| mitigated – zneplatněné OB (box končí na svíčce mitigace,     |
+   //| tečkovaný okraj); aktivní OB sahají k pravému okraji grafu    |
+   //| (extend.right v Pine)                                         |
    //+---------------------------------------------------------------+
    void              DrawBlocks(const SOrderBlock &blocks[], const int count, const bool internal, const bool mitigated)
      {
       int total = MathMin(count, ArraySize(blocks));
       for(int i = 0; i < total; i++)
         {
-         // Internal a swing se barvou liší jen u býčích OB
          color base = mitigated                      ? COLOR_MITIGATED
-                      : blocks[i].bias != OB_BULLISH ? COLOR_BLOCK_BEARISH
-                      : internal                     ? COLOR_INTERNAL_BULLISH
-                                                     : COLOR_SWING_BULLISH;
+                      : blocks[i].bias == OB_BULLISH ? COLOR_BLOCK_BULLISH
+                                                     : COLOR_BLOCK_BEARISH;
 
          // OB starší než historie grafu se nekreslí; mitigovaný končí na svíčce mitigace
          int left, top, bottom, right = m_canvas.Width(), unused;

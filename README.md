@@ -52,7 +52,8 @@ pozice; dokud trvá, nové signály se ignorují.
 ### Výstup z obchodu
 
 Nákup se zavře, jakmile Bid dosáhne horního (červeného) pásma, prodej po dosažení
-dolního (zeleného) pásma.
+dolního (zeleného) pásma. *Předčasný výstup* (násobek ATR 14, 0 = na pásmu) posune výstup
+o tuto vzdálenost dřív; aktuální hodnota v bodech je vidět v textu vlevo nahoře.
 
 ### Obchodní doba
 
@@ -97,6 +98,7 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Order blocky | Mitigace order blocku | High/Low | Cena, která OB zneplatní (High/Low nebo Close) |
 | Order blocky | Počet kontrolovaných nejnovějších OB | 5 | Kolik nejnovějších OB se kontroluje |
 | Order blocky | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
+| Order blocky | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.3 | O kolik dřív se pozice zavře (0 = na pásmu) |
 | Order blocky | Počet svíček historie pro rozběh | 2000 | Historie zpracovaná při startu |
 | Zobrazení | Kreslit graf jako v TradingView | ano | Bollinger Bands a Svopex SMC kreslené expertem |
 | Zobrazení | Mitigované order blocky | ano | Zneplatněné OB končící na svíčce mitigace |
@@ -115,7 +117,7 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
   grafu; po odebrání experta se původní barvy vrátí),
 - Bollinger Bands: modrý střed, červené horní a zelené dolní pásmo, výplň mezi pásmy,
 - aktivní order blocky sahající doprava (počet podle *Počet kontrolovaných nejnovějších OB*);
-  býčí (long) jsou modré, medvědí (short) zelené – na rozdíl od červených v Pine,
+  býčí (long) jsou zelené a medvědí (short) červené, o něco tmavší než svíčky (v Pine jsou long modré),
 - 5 nejnovějších mitigovaných order blocků v šedé barvě pro oba směry (box končí na svíčce
   mitigace, tečkovaný okraj),
 - internal BOS/CHoCH (čárkovaně) a swing BOS/CHoCH (plně) s popisky,

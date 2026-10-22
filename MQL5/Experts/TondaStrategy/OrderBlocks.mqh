@@ -16,9 +16,9 @@
 // Maximální počet nevyzvednutých událostí struktury (víc se jich ani nekreslí)
 #define EVENTS_MAX_STORED 500
 
-// Délky ATR použité v indikátoru: 200 pro filtr volatilních svíček a EQH/EQL, 14 pro toleranci nového OB
+// Délky ATR použité v indikátoru: 200 pro filtr volatilních svíček a EQH/EQL, 14 pro cenové vzdálenosti (tolerance nového OB, předčasný výstup)
 #define ATR_FILTER_LENGTH     200
-#define ATR_TOLERANCE_LENGTH  14
+#define ATR_DISTANCE_LENGTH  14
 
 // Hodnota úrovně swingu, která ještě nebyla nalezena (ceny jsou vždy kladné)
 const double NO_LEVEL = 0.0;
@@ -191,7 +191,7 @@ private:
    CMarketStructure  m_internal;
    CMarketStructure  m_equal;
    CRma              m_atrFilter;
-   CRma              m_atrTolerance;
+   CRma              m_atrDistance;
    ENUM_OB_MITIGATION m_mitigation;
    double            m_equalThreshold; // citlivost EQH/EQL v násobcích ATR(200)
    int               m_barIndex;       // index poslední zpracované svíčky (-1 = žádná)
@@ -215,7 +215,7 @@ public:
       m_internal.Init(STRUCTURE_INTERNAL, internalLength, useInternal);
       m_equal.Init(STRUCTURE_EQUAL, equalLength, false);
       m_atrFilter.Init(ATR_FILTER_LENGTH);
-      m_atrTolerance.Init(ATR_TOLERANCE_LENGTH);
+      m_atrDistance.Init(ATR_DISTANCE_LENGTH);
       m_mitigation     = mitigation;
       m_equalThreshold = equalThreshold;
       m_barIndex       = -1;
@@ -261,7 +261,7 @@ public:
                                 const double price, const double currentLow, const double currentHigh,
                                 SOrderBlock &signal)
      {
-      double tolerance = NewBlockTolerance(toleranceAtr);
+      double tolerance = AtrDistance(toleranceAtr);
       if(FindSignalIn(m_internal, bias, maxBlocks, tolerance, price, currentLow, currentHigh, signal))
          return true;
       return FindSignalIn(m_swing, bias, maxBlocks, tolerance, price, currentLow, currentHigh, signal);
@@ -294,9 +294,9 @@ public:
    STrailingExtremes Trailing() const { return m_trailing; }
    int               SwingTrend() const { return m_swing.m_trend; }
 
-   // Cenová vzdálenost, ve které se ještě vstupuje u nového OB: toleranceAtr × ATR(14)
+   // Cenová vzdálenost multiple × ATR(14), např. tolerance nového OB nebo předčasný výstup
    // (0, dokud není dost svíček)
-   double            NewBlockTolerance(const double toleranceAtr) const { return toleranceAtr * m_atrTolerance.Value(); }
+   double            AtrDistance(const double multiple) const { return multiple * m_atrDistance.Value(); }
 
 private:
    // Svíčka podle absolutního indexu (musí být v rozsahu kruhového bufferu)
@@ -320,7 +320,7 @@ private:
          trueRange = MathMax(range, MathMax(MathAbs(bar.high - prevClose), MathAbs(bar.low - prevClose)));
         }
       double atr = m_atrFilter.Update(trueRange);
-      m_atrTolerance.Update(trueRange);
+      m_atrDistance.Update(trueRange);
 
       bool highVolatilityBar = atr > 0.0 && range >= 2.0 * atr;
       SBar stored;
