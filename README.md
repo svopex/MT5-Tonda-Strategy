@@ -10,6 +10,7 @@ a `docs/BollingerBands.pine`.
 - `MQL5/Experts/TondaStrategy/OrderBlocks.mqh` – detekce struktury a order blocků převzatá
   z indikátoru Svopex SMC.
 - `MQL5/Experts/TondaStrategy/ChartDrawing.mqh` – kreslení grafu jako v TradingView.
+- `MQL5/Experts/TondaStrategy/ZoneCanvas.mqh` – průhledná bitmapa pro order blocky a výplň BB.
 - `scripts/install.ps1` – instalace a kompilace experta ve všech terminálech MT5.
 - `docs/` – zadání strategie a zdrojové Pine skripty.
 
@@ -98,8 +99,7 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
 
 - tmavé pozadí `#0C0C0C`, zelené a červené svíčky bez mřížky (nastaví se vždy, při kreslení
   grafu; po odebrání experta se původní barvy vrátí),
-- Bollinger Bands: modrý střed, červené horní a zelené dolní pásmo (bez výplně mezi pásmy –
-  MT5 míchá překrývající se vyplněné objekty přes XOR a order blocky uvnitř pásma by měnily barvu),
+- Bollinger Bands: modrý střed, červené horní a zelené dolní pásmo, výplň mezi pásmy,
 - aktivní order blocky sahající doprava (počet podle *Počet kontrolovaných nejnovějších OB*);
   býčí (long) jsou modré, medvědí (short) zelené – na rozdíl od červených v Pine,
 - 5 nejnovějších mitigovaných order blocků v šedé barvě pro oba směry (box končí na svíčce
@@ -107,8 +107,12 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
 - internal BOS/CHoCH (čárkovaně) a swing BOS/CHoCH (plně) s popisky,
 - EQH/EQL (tečkovaně) a Strong/Weak High a Low.
 
-Vše je kreslené grafickými objekty. MT5 nemá u objektů průhlednost, proto se barvy
-s průhledností z Pine předem smíchají s pozadím; vypadají stejně, jen průnik dvou
-překrývajících se boxů má jinou barvu. Struktura se počítá z uzavřených svíček, takže BOS/CHoCH a nové OB se objeví až
+Vyplněné zóny (order blocky a výplň BB) se kreslí do jedné průhledné bitmapy za svíčkami,
+kde se barvy skládají s průhledností z Pine stejně jako v TradingView – i tam, kde se boxy
+překrývají. Vyplněné grafické objekty MT5 se při překryvu míchají přes XOR (průnik dvou
+stejných boxů by zmizel), proto se pro zóny nepoužívají. Bitmapa se překresluje na nové
+svíčce, při posunu, zoomu a změně cenového měřítka grafu. Čáry a popisky jsou grafické objekty.
+
+Struktura se počítá z uzavřených svíček, takže BOS/CHoCH a nové OB se objeví až
 po uzavření svíčky (TradingView je kreslí už během svíčky). Rozdíly mohou vzniknout
 i z odlišných cenových dat brokera.

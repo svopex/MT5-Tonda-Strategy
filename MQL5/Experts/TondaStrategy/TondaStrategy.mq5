@@ -79,7 +79,7 @@ int OnInit()
    settings.showEqualHighsLows    = InpShowEqualHighsLows;
    settings.showStrongWeak        = InpShowStrongWeak;
    settings.bandsBars             = MathMax(InpBandsBars, 1);
-   g_chart.Init(settings, g_bandsHandle);
+   g_chart.Init(settings, g_bandsHandle, g_detector);
 
    g_detector.Init(InpSwingLength, InpInternalLength, InpUseSwingBlocks, InpUseInternalBlocks, InpMitigation);
    g_lastBarTime = 0;
@@ -102,6 +102,15 @@ void OnDeinit(const int reason)
   }
 
 //+------------------------------------------------------------------+
+//| Časovač kreslení: překreslí zóny po posunu, zoomu nebo změně     |
+//| měřítka grafu                                                    |
+//+------------------------------------------------------------------+
+void OnTimer()
+  {
+   g_chart.OnTimer();
+  }
+
+//+------------------------------------------------------------------+
 //| Zpracování ticku                                                 |
 //+------------------------------------------------------------------+
 void OnTick()
@@ -115,7 +124,7 @@ void OnTick()
    SBandValues bands;
    if(!ReadBands(bands))
       return;
-   g_chart.Refresh(g_detector, newBar, bands);
+   g_chart.Refresh(newBar, bands);
 
    double bid    = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    ulong  ticket = FindOpenPosition();

@@ -3,22 +3,31 @@
 //| Kreslení grafu jako v TradingView přímo z experta: Bollinger     |
 //| Bands (docs/BollingerBands.pine) a Svopex SMC                    |
 //| (docs/SvopexSMC.pine) – order blocky, BOS/CHoCH, EQH/EQL         |
-//| a Strong/Weak High/Low.                                          |
+//| a Strong/Weak High/Low. Vyplněné zóny jsou v průhledné bitmapě,  |
+//| čáry a popisky jsou grafické objekty.                            |
 //+------------------------------------------------------------------+
 #include "OrderBlocks.mqh"
+#include "ZoneCanvas.mqh"
 
-// Prefixy objektů: trvalé události struktury, překreslované zóny a úseky Bollinger Bands
-#define EVENT_PREFIX   "TondaE_"
-#define ZONE_PREFIX    "TondaZ_"
-#define BANDS_PREFIX   "TondaB_"
+// Prefixy objektů: trvalé události struktury, čáry Strong/Weak a úseky Bollinger Bands
+#define EVENT_PREFIX     "TondaE_"
+#define TRAILING_PREFIX  "TondaT_"
+#define BANDS_PREFIX     "TondaB_"
+
+// Bitmapa s vyplněnými zónami a interval kontroly změny pohledu grafu (nejvýš 5 překreslení za sekundu)
+#define CANVAS_NAME                "TondaCanvas"
+#define CANVAS_CHECK_INTERVAL_MS   200
 
 // Limit trvalých čar struktury (v Pine max_lines_count = 500) a počet mitigovaných OB
 #define MAX_EVENT_OBJECTS   500
 #define MITIGATED_COUNT     5
 
-// Jak daleko doprava sahají aktivní OB (extend.right) a čáry Strong/Weak (20 svíček v Pine)
-#define BLOCK_EXTEND_BARS     500
+// Jak daleko doprava sahají čáry Strong/Weak (20 svíček v Pine); aktivní OB sahají k pravému okraji grafu
 #define TRAILING_EXTEND_BARS  20
+
+// Tečkovaný okraj mitigovaného OB: délka čárky a mezery v pixelech
+#define DOT_LENGTH  2
+#define DOT_GAP     2
 
 // Barvy tmavého motivu TradingView a indikátorů z Pine
 #define COLOR_BACKGROUND        C'12,12,12'
@@ -26,6 +35,7 @@
 #define COLOR_BULLISH           C'8,153,129'
 #define COLOR_BEARISH           C'242,54,69'
 #define COLOR_BANDS_BASIS       C'41,98,255'
+#define COLOR_BANDS_FILL        C'33,150,243'
 #define COLOR_INTERNAL_BULLISH  C'49,121,245'
 #define COLOR_SWING_BULLISH     C'24,72,204'
 // Medvědí (short) OB, internal i swing, jsou na přání zelené místo červených z Pine
@@ -34,6 +44,7 @@
 #define COLOR_MITIGATED         C'120,123,134'
 
 // Průhlednosti barev z Pine (0 = neprůhledná, 100 = neviditelná)
+#define BANDS_FILL_TRANSPARENCY       95
 #define BLOCK_TRANSPARENCY            80
 #define MITIGATED_TRANSPARENCY        85
 #define MITIGATED_BORDER_TRANSPARENCY 50
@@ -77,8 +88,8 @@ struct SChartDrawingSettings
   };
 
 //+------------------------------------------------------------------+
-//| Kreslení vizuálu TradingView grafickými objekty. Při vypnutém    |
-//| kreslení (nebo v testeru bez vizualizace) nedělá nic.            |
+//| Kreslení vizuálu TradingView. Při vypnutém kreslení (nebo        |
+//| v testeru bez vizualizace) nedělá nic.                           |
 //+------------------------------------------------------------------+
 class CChartDrawing
   {
@@ -86,14 +97,16 @@ private:
    SChartDrawingSettings m_settings;
    bool              m_enabled;
    int               m_bandsHandle;
+   COrderBlockDetector *m_detector;
+   CZoneCanvas       m_canvas;          // výplň BB a order blocky s průhledností
    int               m_eventCount;      // počet vykreslených událostí struktury
    long              m_savedColors[];   // původní hodnoty THEME_PROPERTIES
    datetime          m_currentSegment;  // začátek úseku BB končícího na tvořené svíčce (0 = BB ještě nejsou)
    datetime          m_oldestSegment;   // začátek nejstaršího nakresleného úseku BB
 
 public:
-   // settings – co kreslit, bandsHandle – handle iBands experta
-   void              Init(const SChartDrawingSettings &settings, const int bandsHandle)
+   // settings – co kreslit, bandsHandle – handle iBands experta, detector – zdroj struktury a OB
+   void              Init(const SChartDrawingSettings &settings, const int bandsHandle, COrderBlockDetector &detector)
      {
       // V testeru bez vizualizace se nekreslí (zbytečně zpomaluje)
       m_enabled = settings.enabled && (!MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_VISUAL_MODE));
@@ -102,11 +115,16 @@ public:
 
       m_settings       = settings;
       m_bandsHandle    = bandsHandle;
+      m_detector       = GetPointer(detector);
       m_eventCount     = 0;
       m_currentSegment = 0;
       m_oldestSegment  = 0;
       Clear();
       ApplyChartColors();
+
+      // Bitmapa vzniká před čarami BB, aby ležela pod nimi; časovač hlídá změny pohledu grafu
+      m_canvas.Open(CANVAS_NAME);
+      EventSetMillisecondTimer(CANVAS_CHECK_INTERVAL_MS);
      }
 
    // Smaže všechny objekty a vrátí původní barvy grafu
@@ -114,7 +132,9 @@ public:
      {
       if(!m_enabled)
          return;
+      EventKillTimer();
       Clear();
+      m_canvas.Destroy();
       RestoreChartColors();
      }
 
@@ -124,7 +144,7 @@ public:
    //| tvořené svíčky. newBar – přibyla uzavřená svíčka,             |
    //| current – hodnoty BB tvořené svíčky                           |
    //+---------------------------------------------------------------+
-   void              Refresh(COrderBlockDetector &detector, const bool newBar, const SBandValues &current)
+   void              Refresh(const bool newBar, const SBandValues &current)
      {
       if(!m_enabled)
          return;
@@ -138,33 +158,27 @@ public:
       // Dokud nejsou data BB, zkouší se to znovu na dalším ticku
       if(!SyncBands())
          return;
-      DrawEvents(detector);
-      DrawZones(detector);
-      ChartRedraw();
+      DrawEvents();
+      DrawTrailing();
+      DrawCanvas();
+     }
+
+   //+---------------------------------------------------------------+
+   //| Časovač: posun, zoom, změna velikosti grafu i automatického   |
+   //| měřítka ceny posunou zóny v pixelech, bitmapa se překreslí.   |
+   //| Funguje i bez ticků a v testeru, kde nechodí události grafu.  |
+   //+---------------------------------------------------------------+
+   void              OnTimer()
+     {
+      if(m_enabled && m_currentSegment != 0 && m_canvas.ViewChanged())
+         DrawCanvas();
      }
 
 private:
-   //+---------------------------------------------------------------+
-   //| Smíchá barvu s pozadím podle průhlednosti (MT5 neumí alfa     |
-   //| kanál u objektů, na pevném pozadí je výsledek stejný jako v TV)|
-   //| value – barva, transparency – průhlednost 0–100 jako v Pine   |
-   //+---------------------------------------------------------------+
-   color             Blend(const color value, const int transparency)
-     {
-      double alpha  = (100 - transparency) / 100.0;
-      int    result = 0;
-      for(int shift = 0; shift <= 16; shift += 8)
-        {
-         int channel = (int)MathRound(alpha * ((value >> shift) & 0xFF) + (1.0 - alpha) * ((COLOR_BACKGROUND >> shift) & 0xFF));
-         result |= channel << shift;
-        }
-      return (color)result;
-     }
-
    void              Clear()
      {
       ObjectsDeleteAll(0, EVENT_PREFIX);
-      ObjectsDeleteAll(0, ZONE_PREFIX);
+      ObjectsDeleteAll(0, TRAILING_PREFIX);
       ObjectsDeleteAll(0, BANDS_PREFIX);
      }
 
@@ -191,10 +205,10 @@ private:
    //| Vykreslí nové události struktury z detektoru: čáru BOS/CHoCH  |
    //| nebo EQH/EQL a popisek uprostřed                              |
    //+---------------------------------------------------------------+
-   void              DrawEvents(COrderBlockDetector &detector)
+   void              DrawEvents()
      {
       SStructureEvent events[];
-      int count = detector.TakeEvents(events);
+      int count = m_detector.TakeEvents(events);
       for(int i = 0; i < count; i++)
         {
          SStructureEvent event = events[i];
@@ -282,10 +296,8 @@ private:
      }
 
    //+---------------------------------------------------------------+
-   //| Nakreslí jeden úsek linií BB. Výplň mezi pásmy se nekreslí:   |
-   //| MT5 míchá překrývající se vyplněné objekty přes XOR a OB      |
-   //| uvnitř pásma by měnily barvu. Úseky bez hodnoty (před první   |
-   //| periodou) se vynechají.                                       |
+   //| Nakreslí jeden úsek linií BB (výplň je v bitmapě). Úseky bez  |
+   //| hodnoty (před první periodou) se vynechají.                   |
    //+---------------------------------------------------------------+
    void              CreateSegment(const datetime t1, const double basis1, const double upper1, const double lower1,
                                    const datetime t2, const double basis2, const double upper2, const double lower2)
@@ -319,40 +331,82 @@ private:
      }
 
    //+---------------------------------------------------------------+
-   //| Překreslí order blocky a Strong/Weak High/Low. Vypnutá        |
-   //| struktura nemá žádné OB, takže se pro ni nic nenakreslí.      |
+   //| Překreslí bitmapu: výplň BB a order blocky. Vypnutá struktura |
+   //| nemá žádné OB, takže se pro ni nic nenakreslí.                |
    //+---------------------------------------------------------------+
-   void              DrawZones(COrderBlockDetector &detector)
+   void              DrawCanvas()
      {
-      ObjectsDeleteAll(0, ZONE_PREFIX);
-
-      datetime currentTime = iTime(_Symbol, _Period, 0);
-      datetime farRight    = currentTime + PeriodSeconds(_Period) * BLOCK_EXTEND_BARS;
+      m_canvas.Begin();
+      DrawBandsFill();
       for(int kind = 0; kind < 2; kind++)
         {
          bool internal = kind == 0;
-         CMarketStructure *structure = detector.Structure(internal);
-         DrawBlocks(structure.m_blocks, m_settings.blocksCount, internal, false, farRight);
+         CMarketStructure *structure = m_detector.Structure(internal);
          if(m_settings.showMitigatedBlocks)
-            DrawBlocks(structure.m_mitigated, MITIGATED_COUNT, internal, true, farRight);
+            DrawBlocks(structure.m_mitigated, MITIGATED_COUNT, internal, true);
+         DrawBlocks(structure.m_blocks, m_settings.blocksCount, internal, false);
         }
-
-      if(m_settings.showStrongWeak)
-         DrawTrailing(detector, currentTime + PeriodSeconds(_Period) * TRAILING_EXTEND_BARS);
+      m_canvas.Update(true);
      }
 
    //+---------------------------------------------------------------+
-   //| Vykreslí nejvýše count nejnovějších OB ze seznamu.            |
-   //| internal – barva internal/swing OB, mitigated – zneplatněné   |
-   //| OB (box končí na svíčce mitigace, tečkovaný okraj),           |
-   //| farRight – pravý okraj aktivních OB                           |
+   //| Výplň mezi horním a dolním pásmem BB pro viditelné svíčky     |
+   //| (nejvýše v rozsahu kreslených linií BB)                       |
    //+---------------------------------------------------------------+
-   void              DrawBlocks(const SOrderBlock &blocks[], const int count, const bool internal,
-                                const bool mitigated, const datetime farRight)
+   void              DrawBandsFill()
      {
-      int    total  = MathMin(count, ArraySize(blocks));
-      string prefix = ZONE_PREFIX + (internal ? "I" : "S") + (mitigated ? "M" : "A");
+      int bars = (int)MathMin(ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR), m_settings.bandsBars) + 1;
+      if(bars < 2)
+         return;
 
+      double upper[], lower[];
+      datetime times[];
+      ArraySetAsSeries(upper, true);
+      ArraySetAsSeries(lower, true);
+      ArraySetAsSeries(times, true);
+      if(CopyBuffer(m_bandsHandle, UPPER_BAND, 0, bars, upper) != bars ||
+         CopyBuffer(m_bandsHandle, LOWER_BAND, 0, bars, lower) != bars ||
+         CopyTime(_Symbol, _Period, 0, bars, times) != bars)
+         return;
+
+      // Mezi středy sousedních svíček se hranice pásma lineárně prokládají po sloupcích pixelů;
+      // body předchozí svíčky se použijí znovu
+      int  previousX = 0, previousUpper = 0, previousLower = 0;
+      bool hasPrevious = false;
+      for(int shift = bars - 1; shift >= 0; shift--)
+        {
+         int x, yUpper, yLower;
+         if(upper[shift] == EMPTY_VALUE || upper[shift] == 0.0 ||
+            !m_canvas.ToXY(times[shift], upper[shift], x, yUpper) ||
+            !m_canvas.ToXY(times[shift], lower[shift], x, yLower))
+           {
+            hasPrevious = false;
+            continue;
+           }
+
+         for(int column = previousX; hasPrevious && column < x; column++)
+           {
+            double ratio = (double)(column - previousX) / (x - previousX);
+            m_canvas.FillRect(column, (int)MathRound(previousUpper + (yUpper - previousUpper) * ratio),
+                              column, (int)MathRound(previousLower + (yLower - previousLower) * ratio),
+                              COLOR_BANDS_FILL, BANDS_FILL_TRANSPARENCY);
+           }
+         previousX     = x;
+         previousUpper = yUpper;
+         previousLower = yLower;
+         hasPrevious   = true;
+        }
+     }
+
+   //+---------------------------------------------------------------+
+   //| Vykreslí nejvýše count nejnovějších OB ze seznamu do bitmapy. |
+   //| internal – barva internal/swing OB, mitigated – zneplatněné   |
+   //| OB (box končí na svíčce mitigace, tečkovaný okraj); aktivní   |
+   //| OB sahají k pravému okraji grafu (extend.right v Pine)        |
+   //+---------------------------------------------------------------+
+   void              DrawBlocks(const SOrderBlock &blocks[], const int count, const bool internal, const bool mitigated)
+     {
+      int total = MathMin(count, ArraySize(blocks));
       for(int i = 0; i < total; i++)
         {
          // Internal a swing se barvou liší jen u býčích OB
@@ -361,38 +415,46 @@ private:
                       : internal                     ? COLOR_INTERNAL_BULLISH
                                                      : COLOR_SWING_BULLISH;
 
-         datetime right = mitigated ? blocks[i].mitigatedTime : farRight;
-         string   name  = prefix + IntegerToString(i);
-         CreateBox(name, blocks[i].time, blocks[i].high, right, blocks[i].low,
-                   Blend(base, mitigated ? MITIGATED_TRANSPARENCY : BLOCK_TRANSPARENCY), true, STYLE_SOLID);
+         // OB starší než historie grafu se nekreslí; mitigovaný končí na svíčce mitigace
+         int left, top, bottom, right = m_canvas.Width(), unused;
+         if(!m_canvas.ToXY(blocks[i].time, blocks[i].high, left, top) ||
+            !m_canvas.ToXY(blocks[i].time, blocks[i].low, left, bottom) ||
+            (mitigated && !m_canvas.ToXY(blocks[i].mitigatedTime, blocks[i].low, right, unused)))
+            continue;
+         m_canvas.FillRect(left, top, right, bottom, base, mitigated ? MITIGATED_TRANSPARENCY : BLOCK_TRANSPARENCY);
 
-         // Mitigovaný OB má navíc tečkovaný okraj se sytější barvou
+         // Mitigovaný OB má tečkovaný okraj se sytější barvou, swing OB plný okraj (jako v Pine)
          if(mitigated)
-            CreateBox(name + "B", blocks[i].time, blocks[i].high, right, blocks[i].low,
-                      Blend(base, MITIGATED_BORDER_TRANSPARENCY), false, STYLE_DOT);
+            m_canvas.BorderRect(left, top, right, bottom, base, MITIGATED_BORDER_TRANSPARENCY, DOT_LENGTH, DOT_GAP);
+         else if(!internal)
+            m_canvas.BorderRect(left, top, right, bottom, base, BLOCK_TRANSPARENCY, 1, 0);
         }
      }
 
    //+---------------------------------------------------------------+
    //| Strong/Weak High a Low: čára od posledního extrému doprava    |
-   //| a popisek podle trendu swing struktury                        |
-   //| rightTime – pravý konec čar                                   |
+   //| a popisek podle trendu swing struktury (grafické objekty)     |
    //+---------------------------------------------------------------+
-   void              DrawTrailing(COrderBlockDetector &detector, const datetime rightTime)
+   void              DrawTrailing()
      {
-      STrailingExtremes trailing = detector.Trailing();
-      int trend = detector.SwingTrend();
+      ObjectsDeleteAll(0, TRAILING_PREFIX);
+      if(!m_settings.showStrongWeak)
+         return;
+
+      datetime          rightTime = iTime(_Symbol, _Period, 0) + PeriodSeconds(_Period) * TRAILING_EXTEND_BARS;
+      STrailingExtremes trailing  = m_detector.Trailing();
+      int               trend     = m_detector.SwingTrend();
 
       if(trailing.top != NO_LEVEL)
         {
-         CreateLine(ZONE_PREFIX + "TopL", trailing.topTime, trailing.top, rightTime, trailing.top, COLOR_BEARISH, STYLE_SOLID, false);
-         CreateText(ZONE_PREFIX + "TopT", rightTime, trailing.top, trend == OB_BEARISH ? "Strong High" : "Weak High",
+         CreateLine(TRAILING_PREFIX + "TopL", trailing.topTime, trailing.top, rightTime, trailing.top, COLOR_BEARISH, STYLE_SOLID, false);
+         CreateText(TRAILING_PREFIX + "TopT", rightTime, trailing.top, trend == OB_BEARISH ? "Strong High" : "Weak High",
                     COLOR_BEARISH, FONT_TINY, ANCHOR_LOWER);
         }
       if(trailing.bottom != NO_LEVEL)
         {
-         CreateLine(ZONE_PREFIX + "BottomL", trailing.bottomTime, trailing.bottom, rightTime, trailing.bottom, COLOR_BULLISH, STYLE_SOLID, false);
-         CreateText(ZONE_PREFIX + "BottomT", rightTime, trailing.bottom, trend == OB_BULLISH ? "Strong Low" : "Weak Low",
+         CreateLine(TRAILING_PREFIX + "BottomL", trailing.bottomTime, trailing.bottom, rightTime, trailing.bottom, COLOR_BULLISH, STYLE_SOLID, false);
+         CreateText(TRAILING_PREFIX + "BottomT", rightTime, trailing.bottom, trend == OB_BULLISH ? "Strong Low" : "Weak Low",
                     COLOR_BULLISH, FONT_TINY, ANCHOR_UPPER);
         }
      }
@@ -434,16 +496,5 @@ private:
       ObjectSetInteger(0, name, OBJPROP_ANCHOR, anchor);
      }
 
-   // filled – vyplněný box, jinak jen okraj daným stylem; vždy za svíčkami
-   void              CreateBox(const string name, const datetime time1, const double price1,
-                               const datetime time2, const double price2, const color boxColor,
-                               const bool filled, const ENUM_LINE_STYLE style)
-     {
-      if(!ObjectCreate(0, name, OBJ_RECTANGLE, 0, time1, price1, time2, price2))
-         return;
-      SetCommon(name, boxColor, true);
-      ObjectSetInteger(0, name, OBJPROP_FILL, filled);
-      ObjectSetInteger(0, name, OBJPROP_STYLE, style);
-     }
   };
 //+------------------------------------------------------------------+
