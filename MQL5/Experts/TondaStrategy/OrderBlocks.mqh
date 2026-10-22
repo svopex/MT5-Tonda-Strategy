@@ -261,7 +261,7 @@ public:
                                 const double price, const double currentLow, const double currentHigh,
                                 SOrderBlock &signal)
      {
-      double tolerance = toleranceAtr * m_atrTolerance.Value();
+      double tolerance = NewBlockTolerance(toleranceAtr);
       if(FindSignalIn(m_internal, bias, maxBlocks, tolerance, price, currentLow, currentHigh, signal))
          return true;
       return FindSignalIn(m_swing, bias, maxBlocks, tolerance, price, currentLow, currentHigh, signal);
@@ -293,6 +293,10 @@ public:
    // Strong/Weak High a Low: trailing extrémy a trend swing struktury
    STrailingExtremes Trailing() const { return m_trailing; }
    int               SwingTrend() const { return m_swing.m_trend; }
+
+   // Cenová vzdálenost, ve které se ještě vstupuje u nového OB: toleranceAtr × ATR(14)
+   // (0, dokud není dost svíček)
+   double            NewBlockTolerance(const double toleranceAtr) const { return toleranceAtr * m_atrTolerance.Value(); }
 
 private:
    // Svíčka podle absolutního indexu (musí být v rozsahu kruhového bufferu)

@@ -91,6 +91,7 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Zobrazení | Equal High/Low | ano | Čáry a popisky EQH/EQL |
 | Zobrazení | Strong/Weak High/Low | ano | Poslední swing high a low s popiskem |
 | Zobrazení | Počet svíček s Bollinger Bands | 500 | Kolik posledních svíček má nakreslené BB |
+| Zobrazení | Text vlevo nahoře | ano | Stav obchodování a aktuální tolerance nového OB v bodech |
 
 ## Zobrazení v grafu
 
@@ -105,7 +106,11 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
 - 5 nejnovějších mitigovaných order blocků v šedé barvě pro oba směry (box končí na svíčce
   mitigace, tečkovaný okraj),
 - internal BOS/CHoCH (čárkovaně) a swing BOS/CHoCH (plně) s popisky,
-- EQH/EQL (tečkovaně) a Strong/Weak High a Low.
+- EQH/EQL (tečkovaně) a Strong/Weak High a Low,
+- text vlevo nahoře: zda expert může obchodovat (`ZAPNUTO`, nebo `VYPNUTO` s důvodem – např.
+  vypnuté Algoritmické obchodování v terminálu nebo ve vlastnostech experta, chybějící připojení,
+  zákaz obchodování na účtu či symbolu) a aktuální tolerance nového OB v bodech
+  (*Tolerance nového OB* × ATR 14).
 
 Vyplněné zóny (order blocky a výplň BB) se kreslí do jedné průhledné bitmapy za svíčkami,
 kde se barvy skládají s průhledností z Pine stejně jako v TradingView – i tam, kde se boxy

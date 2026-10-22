@@ -14,7 +14,8 @@
 #define TRAILING_PREFIX  "TondaT_"
 #define BANDS_PREFIX     "TondaB_"
 
-// Bitmapa s vyplněnými zónami a interval kontroly změny pohledu grafu (nejvýš 5 překreslení za sekundu)
+// Bitmapa s vyplněnými zónami a interval časovače experta, který hlídá změnu pohledu grafu
+// (nejvýš 5 překreslení za sekundu)
 #define CANVAS_NAME                "TondaCanvas"
 #define CANVAS_CHECK_INTERVAL_MS   200
 
@@ -63,6 +64,15 @@ const long THEME_VALUES[] = {CHART_CANDLES, false, COLOR_BACKGROUND, COLOR_FOREG
                              COLOR_BULLISH, COLOR_BEARISH, COLOR_BEARISH, COLOR_BULLISH};
 
 //+------------------------------------------------------------------+
+//| Je výstup do grafu vidět? V testeru bez vizualizace ne, kreslit  |
+//| a vypisovat by jen zpomalovalo                                   |
+//+------------------------------------------------------------------+
+bool IsChartVisible()
+  {
+   return !MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_VISUAL_MODE);
+  }
+
+//+------------------------------------------------------------------+
 //| Hodnoty Bollinger Bands jedné svíčky                             |
 //+------------------------------------------------------------------+
 struct SBandValues
@@ -108,8 +118,7 @@ public:
    // settings – co kreslit, bandsHandle – handle iBands experta, detector – zdroj struktury a OB
    void              Init(const SChartDrawingSettings &settings, const int bandsHandle, COrderBlockDetector &detector)
      {
-      // V testeru bez vizualizace se nekreslí (zbytečně zpomaluje)
-      m_enabled = settings.enabled && (!MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_VISUAL_MODE));
+      m_enabled = settings.enabled && IsChartVisible();
       if(!m_enabled)
          return;
 
@@ -122,9 +131,8 @@ public:
       Clear();
       ApplyChartColors();
 
-      // Bitmapa vzniká před čarami BB, aby ležela pod nimi; časovač hlídá změny pohledu grafu
+      // Bitmapa vzniká před čarami BB, aby ležela pod nimi
       m_canvas.Open(CANVAS_NAME);
-      EventSetMillisecondTimer(CANVAS_CHECK_INTERVAL_MS);
      }
 
    // Smaže všechny objekty a vrátí původní barvy grafu
@@ -132,7 +140,6 @@ public:
      {
       if(!m_enabled)
          return;
-      EventKillTimer();
       Clear();
       m_canvas.Destroy();
       RestoreChartColors();

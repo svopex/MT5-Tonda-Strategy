@@ -41,12 +41,15 @@ input bool               InpShowSwingStructure   = true;          // Swing struk
 input bool               InpShowEqualHighsLows   = true;          // Equal High/Low
 input bool               InpShowStrongWeak       = true;          // Strong/Weak High/Low
 input int                InpBandsBars            = 500;           // Počet svíček s Bollinger Bands
+input bool               InpShowInfo             = true;          // Text vlevo nahoře (stav obchodování, tolerance OB)
 
 CTrade              g_trade;
 COrderBlockDetector g_detector;
 CChartDrawing       g_chart;
 int                 g_bandsHandle  = INVALID_HANDLE;
 datetime            g_lastBarTime  = 0;   // čas poslední zpracované uzavřené svíčky
+bool                g_infoEnabled  = false; // vypisovat text vlevo nahoře
+string              g_infoText     = "";  // naposledy vypsaný text vlevo nahoře
 
 //+------------------------------------------------------------------+
 //| Inicializace experta                                             |
@@ -87,6 +90,13 @@ int OnInit()
    g_trade.SetExpertMagicNumber(InpMagic);
    g_trade.SetDeviationInPoints(InpSlippagePoints);
    g_trade.SetTypeFillingBySymbol(_Symbol);
+
+   // Text vlevo nahoře jen tam, kde je graf vidět; časovač hlídá pohled grafu i stav obchodování
+   g_infoEnabled = InpShowInfo && IsChartVisible();
+   if(g_infoEnabled || (InpShowChart && IsChartVisible()))
+      EventSetMillisecondTimer(CANVAS_CHECK_INTERVAL_MS);
+   g_infoText = "";
+   UpdateInfo();
    return INIT_SUCCEEDED;
   }
 
@@ -98,16 +108,22 @@ void OnDeinit(const int reason)
    if(g_bandsHandle != INVALID_HANDLE)
       IndicatorRelease(g_bandsHandle);
 
+   EventKillTimer();
    g_chart.Deinit();
+   if(g_infoEnabled)
+      Comment("");
   }
 
 //+------------------------------------------------------------------+
-//| Časovač kreslení: překreslí zóny po posunu, zoomu nebo změně     |
-//| měřítka grafu                                                    |
+//| Časovač: překreslí zóny po posunu, zoomu nebo změně měřítka      |
+//| grafu a obnoví text vlevo nahoře                                 |
 //+------------------------------------------------------------------+
 void OnTimer()
   {
    g_chart.OnTimer();
+
+   // Stav obchodování se může změnit i bez ticku (tlačítko Algoritmické obchodování)
+   UpdateInfo();
   }
 
 //+------------------------------------------------------------------+
@@ -119,6 +135,7 @@ void OnTick()
    bool newBar = false;
    if(!ProcessClosedBars(newBar))
       return;
+   UpdateInfo();
 
    // Hodnoty BB tvořené svíčky se načtou jednou a použijí je kreslení i strategie
    SBandValues bands;
@@ -137,6 +154,52 @@ void OnTick()
      }
 
    CheckEntry(bid, bands);
+  }
+
+//+------------------------------------------------------------------+
+//| Vypíše vlevo nahoře, zda expert může obchodovat, a aktuální      |
+//| toleranci nového OB v bodech. Comment se volá jen při změně.     |
+//+------------------------------------------------------------------+
+void UpdateInfo()
+  {
+   if(!g_infoEnabled)
+      return;
+
+   string reason = TradingBlockReason();
+   string status = reason == "" ? "ZAPNUTO – může obchodovat" : "VYPNUTO – " + reason;
+
+   // Tolerance nového OB stejná jako ve strategii, převedená na body symbolu
+   double distance  = g_detector.NewBlockTolerance(InpNewBlockTolerance);
+   string tolerance = distance > 0.0
+                      ? IntegerToString((int)MathRound(distance / _Point)) + " bodů (" +
+                        DoubleToString(InpNewBlockTolerance, 2) + " × ATR 14)"
+                      : "čeká na data";
+
+   string text = "TondaStrategy: " + status + "\nTolerance nového OB: " + tolerance;
+   if(text == g_infoText)
+      return;
+   g_infoText = text;
+   Comment(text);
+  }
+
+//+------------------------------------------------------------------+
+//| Důvod, proč expert nemůže obchodovat (prázdný = může)            |
+//+------------------------------------------------------------------+
+string TradingBlockReason()
+  {
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED))
+      return "terminál není připojen k serveru";
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+      return "v terminálu je vypnuté Algoritmické obchodování";
+   if(!MQLInfoInteger(MQL_TRADE_ALLOWED))
+      return "ve vlastnostech experta není povolené algoritmické obchodování";
+   if(!AccountInfoInteger(ACCOUNT_TRADE_ALLOWED))
+      return "obchodování na účtu není povolené";
+   if(!AccountInfoInteger(ACCOUNT_TRADE_EXPERT))
+      return "účet nepovoluje obchodování expertů";
+   if(SymbolInfoInteger(_Symbol, SYMBOL_TRADE_MODE) == SYMBOL_TRADE_MODE_DISABLED)
+      return "obchodování symbolu " + _Symbol + " je zakázané";
+   return "";
   }
 
 //+------------------------------------------------------------------+
