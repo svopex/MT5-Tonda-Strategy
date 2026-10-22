@@ -14,11 +14,20 @@
 #include "ChartDrawing.mqh"
 #include "TradingHours.mqh"
 
+// Způsob výpočtu odstupu SL za order blockem (komentáře hodnot se zobrazí v nastavení)
+enum ENUM_SL_OFFSET_MODE
+  {
+   SL_OFFSET_SPREAD, // Násobek aktuálního spreadu
+   SL_OFFSET_POINTS  // Pevný počet bodů
+  };
+
 input group "Obchod"
 input double             InpRiskPercent          = 1.0;           // Riziko na obchod (% zůstatku)
-input int                InpStopLossOffsetPoints = 60;            // Odstup SL od order blocku (body)
+input ENUM_SL_OFFSET_MODE InpStopLossOffsetMode  = SL_OFFSET_SPREAD; // Odstup SL od order blocku
+input double             InpStopLossSpreadMultiple = 1.25;        // Odstup SL – násobek spreadu
+input int                InpStopLossOffsetPoints = 60;            // Odstup SL – pevně (body)
 input ulong              InpMagic                = 202610225598;  // Magic number
-input int                InpSlippagePoints       = 20;            // Maximální skluz (body)
+input double             InpSlippageAtr          = 0.15;          // Maximální skluz (násobek ATR 14)
 
 input group "Obchodní doba (čas serveru, HH:MM)"
 input string             InpTradeStart           = "02:00";       // Začátek obchodování
@@ -65,7 +74,8 @@ string              g_infoText     = "";  // naposledy vypsaný text vlevo naho�
 int OnInit()
   {
    // Kontrola nastavení, se kterým strategie nedává smysl
-   if(InpRiskPercent <= 0.0 || InpStopLossOffsetPoints < 0 || InpMaxBlocks < 1 || InpEarlyExitAtr < 0.0 ||
+   if(InpRiskPercent <= 0.0 || InpStopLossOffsetPoints < 0 || InpStopLossSpreadMultiple < 0.0 ||
+      InpSlippageAtr < 0.0 || InpMaxBlocks < 1 || InpEarlyExitAtr < 0.0 ||
       InpInternalLength < 1 || InpSwingLength < 1 || (!InpUseInternalBlocks && !InpUseSwingBlocks) ||
       !g_hours.Init(InpTradeStart, InpTradeEnd, InpCloseTime))
      {
@@ -97,7 +107,6 @@ int OnInit()
    g_lastBarTime = 0;
 
    g_trade.SetExpertMagicNumber(InpMagic);
-   g_trade.SetDeviationInPoints(InpSlippagePoints);
    g_trade.SetTypeFillingBySymbol(_Symbol);
 
    // Text vlevo nahoře jen tam, kde je graf vidět; časovač hlídá pohled grafu i stav obchodování
@@ -175,7 +184,7 @@ void OnTick()
 
 //+------------------------------------------------------------------+
 //| Vypíše vlevo nahoře, zda expert může obchodovat, a aktuální      |
-//| toleranci nového OB v bodech. Comment se volá jen při změně.     |
+//| vzdálenosti strategie v bodech. Comment se volá jen při změně.   |
 //+------------------------------------------------------------------+
 void UpdateInfo()
   {
@@ -195,11 +204,19 @@ void UpdateInfo()
    string text = "TondaStrategy: " + status +
                  "\nObchodní doba: " + g_hours.Description() +
                  "\nTolerance nového OB: " + AtrPointsText(InpNewBlockTolerance) +
-                 "\nPředčasný výstup: " + earlyExit;
+                 "\nPředčasný výstup: " + earlyExit +
+                 "\nOdstup SL: " + StopLossOffsetText() +
+                 "\nMaximální skluz: " + AtrPointsText(InpSlippageAtr);
    if(text == g_infoText)
       return;
    g_infoText = text;
    Comment(text);
+  }
+
+// Cenová vzdálenost převedená na celé body symbolu
+int ToPoints(const double distance)
+  {
+   return (int)MathRound(distance / _Point);
   }
 
 // Násobek ATR(14) jako text v bodech symbolu, např. "87 bodů (0.50 × ATR 14)"
@@ -208,7 +225,37 @@ string AtrPointsText(const double multiple)
    double distance = g_detector.AtrDistance(multiple);
    if(distance <= 0.0)
       return "čeká na data";
-   return IntegerToString((int)MathRound(distance / _Point)) + " bodů (" + DoubleToString(multiple, 2) + " × ATR " + IntegerToString(ATR_DISTANCE_LENGTH) + ")";
+   return IntegerToString(ToPoints(distance)) + " bodů (" + DoubleToString(multiple, 2) + " × ATR " + IntegerToString(ATR_DISTANCE_LENGTH) + ")";
+  }
+
+// Aktuální spread v ceně (Ask − Bid)
+double CurrentSpread()
+  {
+   return SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID);
+  }
+
+// Odstup SL za order blockem v ceně: pevný počet bodů, nebo násobek aktuálního spreadu
+double StopLossOffset()
+  {
+   if(InpStopLossOffsetMode == SL_OFFSET_POINTS)
+      return InpStopLossOffsetPoints * _Point;
+   return InpStopLossSpreadMultiple * CurrentSpread();
+  }
+
+// Odstup SL jako text v bodech symbolu, např. "9 bodů (1.25 × spread 7 bodů)"
+string StopLossOffsetText()
+  {
+   if(InpStopLossOffsetMode == SL_OFFSET_POINTS)
+      return IntegerToString(InpStopLossOffsetPoints) + " bodů (pevně)";
+   double spread = CurrentSpread();
+   return IntegerToString(ToPoints(InpStopLossSpreadMultiple * spread)) + " bodů (" +
+          DoubleToString(InpStopLossSpreadMultiple, 2) + " × spread " + IntegerToString(ToPoints(spread)) + " bodů)";
+  }
+
+// Nastaví maximální skluz obchodních operací na násobek ATR 14; volá se po každé změně ATR
+void UpdateDeviation()
+  {
+   g_trade.SetDeviationInPoints((ulong)ToPoints(g_detector.AtrDistance(InpSlippageAtr)));
   }
 
 //+------------------------------------------------------------------+
@@ -258,6 +305,7 @@ bool ProcessClosedBars(bool &newBar)
          g_detector.ProcessBar(rates[i]);
    g_lastBarTime = rates[copied - 1].time;
    newBar = true;
+   UpdateDeviation();
    return true;
   }
 
@@ -347,7 +395,7 @@ void OpenPosition(const ENUM_ORDER_TYPE type, const SOrderBlock &block)
   {
    bool   isBuy  = type == ORDER_TYPE_BUY;
    double price  = SymbolInfoDouble(_Symbol, isBuy ? SYMBOL_ASK : SYMBOL_BID);
-   double offset = InpStopLossOffsetPoints * _Point;
+   double offset = StopLossOffset();
 
    // SL pod dolní hranou OB (nákup) nebo nad horní hranou OB (prodej)
    double stopLoss = NormalizeDouble(isBuy ? block.Bottom() - offset : block.Top() + offset, _Digits);

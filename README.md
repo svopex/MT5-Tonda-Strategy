@@ -67,7 +67,11 @@ o tuto vzdálenost dřív; aktuální hodnota v bodech je vidět v textu vlevo n
 ### Stop loss a velikost pozice
 
 - SL je pod dolní hranou order blocku (nákup) nebo nad horní hranou (prodej)
-  plus nastavitelný odstup v bodech (výchozí 60).
+  plus odstup. Ten je buď násobkem aktuálního spreadu v okamžiku vstupu (výchozí 1,25 ×,
+  tedy spread zvětšený o 25 %), nebo pevným počtem bodů (výchozí 60) – podle volby
+  *Odstup SL od order blocku*.
+- Maximální skluz při otevření i zavření pozice je násobek ATR 14 (výchozí 0,15 ×, u XAUUSD M1
+  zhruba 20 bodů), takže se přizpůsobuje volatilitě.
 - Objem se počítá tak, aby ztráta při zásahu SL byla nastavené procento zůstatku účtu.
   Vyjde-li objem pod minimum symbolu, obchod se neotevře.
 
@@ -85,9 +89,11 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Skupina | Parametr | Výchozí | Popis |
 |---|---|---|---|
 | Obchod | Riziko na obchod (% zůstatku) | 1.0 | Ztráta při zásahu SL v % zůstatku |
-| Obchod | Odstup SL od order blocku (body) | 60 | Vzdálenost SL za hranou OB |
+| Obchod | Odstup SL od order blocku | Násobek aktuálního spreadu | Způsob výpočtu vzdálenosti SL za hranou OB (násobek spreadu, nebo pevný počet bodů) |
+| Obchod | Odstup SL – násobek spreadu | 1.25 | Odstup SL jako násobek spreadu při vstupu |
+| Obchod | Odstup SL – pevně (body) | 60 | Odstup SL v bodech, je-li zvolen pevný počet bodů |
 | Obchod | Magic number | 202610225598 | Identifikace pozic experta |
-| Obchod | Maximální skluz (body) | 20 | Povolená odchylka ceny při obchodu |
+| Obchod | Maximální skluz (násobek ATR 14) | 0.15 | Povolená odchylka ceny při obchodu |
 | Obchodní doba | Začátek obchodování | 02:00 | Od kdy se otevírají nové obchody (čas serveru, HH:MM) |
 | Obchodní doba | Konec otevírání obchodů | 23:00 | Do kdy se otevírají nové obchody |
 | Obchodní doba | Zavření otevřených obchodů | 23:45 | Kdy se otevřená pozice zavře |
@@ -106,7 +112,7 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Zobrazení | Equal High/Low | ano | Čáry a popisky EQH/EQL |
 | Zobrazení | Strong/Weak High/Low | ano | Poslední swing high a low s popiskem |
 | Zobrazení | Počet svíček s Bollinger Bands | 500 | Kolik posledních svíček má nakreslené BB |
-| Zobrazení | Text vlevo nahoře | ano | Stav obchodování a aktuální tolerance nového OB v bodech |
+| Zobrazení | Text vlevo nahoře | ano | Stav obchodování a aktuální vzdálenosti strategie v bodech |
 
 ## Zobrazení v grafu
 
@@ -125,7 +131,8 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
 - text vlevo nahoře: zda expert může obchodovat (`ZAPNUTO`, nebo `VYPNUTO` s důvodem – např.
   vypnuté Algoritmické obchodování v terminálu nebo ve vlastnostech experta, chybějící připojení,
   zákaz obchodování na účtu či symbolu; mimo obchodní dobu `ZAPNUTO – mimo obchodní dobu`),
-  nastavená obchodní doba a aktuální tolerance nového OB v bodech (*Tolerance nového OB* × ATR 14).
+  nastavená obchodní doba a aktuální hodnoty v bodech: tolerance nového OB, předčasný výstup,
+  odstup SL a maximální skluz.
 
 Vyplněné zóny (order blocky a výplň BB) se kreslí do jedné průhledné bitmapy za svíčkami,
 kde se barvy skládají s průhledností z Pine stejně jako v TradingView – i tam, kde se boxy
