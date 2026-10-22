@@ -60,12 +60,12 @@ o tuto vzdálenost dřív; aktuální hodnota v bodech je vidět v textu vlevo n
 Časy jsou podle času serveru brokera (stejně jako svíčky v MT5). Volba *Zdroj obchodní doby*
 určuje, odkud se berou:
 
-- **Ručně** (výchozí):
+- **Ručně**:
   - nové obchody se otevírají jen od *Začátek obchodování* (výchozí 02:00) do *Konec otevírání
     obchodů* (výchozí 23:00),
   - v čase *Zavření otevřených obchodů* (výchozí 23:45) se případná otevřená pozice zavře;
     zavírací doba trvá až do začátku dalšího obchodování, takže se mezitím nic neotevře.
-- **Podle obchodních seancí symbolu v MT5** (ze *Specifikace* symbolu, pro každý den v týdnu):
+- **Podle obchodních seancí symbolu v MT5** (výchozí; ze *Specifikace* symbolu, pro každý den v týdnu):
   - nové obchody se otevírají až 60 minut po začátku seance a přestanou 60 minut před jejím
     koncem (*Seance: otevírat až po* / *Seance: neotevírat*),
   - otevřená pozice se zavře 10 minut před koncem seance (*Seance: zavřít pozice*), tedy i před
@@ -106,7 +106,7 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Obchod | Maximální skluz (násobek ATR 14) | 0.15 | Povolená odchylka ceny při obchodu |
 | Obchod | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
 | Obchod | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.5 | O kolik dřív se pozice zavře (0 = na pásmu) |
-| Obchodní doba | Zdroj obchodní doby | Ručně | Ručně zadané časy, nebo obchodní seance symbolu v MT5 |
+| Obchodní doba | Zdroj obchodní doby | Podle seancí symbolu v MT5 | Ručně zadané časy, nebo obchodní seance symbolu v MT5 |
 | Obchodní doba | Ručně: začátek obchodování | 02:00 | Od kdy se otevírají nové obchody (čas serveru, HH:MM) |
 | Obchodní doba | Ručně: konec otevírání obchodů | 23:00 | Do kdy se otevírají nové obchody |
 | Obchodní doba | Ručně: zavření otevřených obchodů | 23:45 | Kdy se otevřená pozice zavře |

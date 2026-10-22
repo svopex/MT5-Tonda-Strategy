@@ -32,7 +32,7 @@ input double             InpNewBlockTolerance    = 0.5;           // Tolerance n
 input double             InpEarlyExitAtr         = 0.5;           // Předčasný výstup před pásmem BB (násobek ATR 14, 0 = na pásmu)
 
 input group "Obchodní doba (čas serveru)"
-input ENUM_HOURS_SOURCE  InpHoursSource          = HOURS_MANUAL;  // Zdroj obchodní doby
+input ENUM_HOURS_SOURCE  InpHoursSource          = HOURS_SESSIONS; // Zdroj obchodní doby
 input string             InpTradeStart           = "02:00";       // Ručně: začátek obchodování (HH:MM)
 input string             InpTradeEnd             = "23:00";       // Ručně: konec otevírání obchodů (HH:MM)
 input string             InpCloseTime            = "23:45";       // Ručně: zavření otevřených obchodů (HH:MM)
