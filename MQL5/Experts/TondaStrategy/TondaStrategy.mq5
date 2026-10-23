@@ -7,7 +7,7 @@
 #property copyright "Petr Svoboda"
 #property link      "https://github.com/svopex/MT5-Tonda-Strategy"
 // Verze experta: vlastnosti experta v MT5 i text vlevo nahoře
-#define EA_VERSION "1.12"
+#define EA_VERSION "1.20"
 #property version   EA_VERSION
 #property description "Order blocky (Svopex SMC) + Bollinger Bands"
 
@@ -23,6 +23,13 @@ enum ENUM_SL_OFFSET_MODE
    SL_OFFSET_POINTS  // Pevný počet bodů
   };
 
+// Způsob výstupu z obchodu (komentáře hodnot se zobrazí v nastavení)
+enum ENUM_EXIT_MODE
+  {
+   EXIT_BANDS, // Na protějším pásmu BB
+   EXIT_RRR    // Take profit podle RRR
+  };
+
 input group "Obchod"
 input double             InpRiskPercent          = 1.0;           // Riziko na obchod (% zůstatku)
 input ENUM_SL_OFFSET_MODE InpStopLossOffsetMode  = SL_OFFSET_SPREAD; // Odstup SL od order blocku
@@ -31,7 +38,9 @@ input int                InpStopLossOffsetPoints = 60;            // Odstup SL �
 input ulong              InpMagic                = 202610225598;  // Magic number
 input double             InpSlippageAtr          = 0.15;          // Maximální skluz (násobek ATR 14)
 input double             InpNewBlockTolerance    = 0.5;           // Tolerance nového OB (násobek ATR 14)
+input ENUM_EXIT_MODE     InpExitMode             = EXIT_BANDS;    // Výstup z obchodu
 input double             InpEarlyExitAtr         = 0.5;           // Předčasný výstup před pásmem BB (násobek ATR 14, 0 = na pásmu)
+input double             InpRiskReward           = 2.0;           // RRR – násobek vzdálenosti SL pro TP (výstup podle RRR)
 
 input group "Obchodní doba (čas serveru)"
 input ENUM_HOURS_SOURCE  InpHoursSource          = HOURS_SESSIONS; // Zdroj obchodní doby
@@ -81,7 +90,7 @@ int OnInit()
   {
    // Kontrola nastavení, se kterým strategie nedává smysl
    if(InpRiskPercent <= 0.0 || InpStopLossOffsetPoints < 0 || InpStopLossSpreadMultiple < 0.0 ||
-      InpSlippageAtr < 0.0 || InpMaxBlocks < 1 || InpEarlyExitAtr < 0.0 ||
+      InpSlippageAtr < 0.0 || InpMaxBlocks < 1 || InpEarlyExitAtr < 0.0 || InpRiskReward <= 0.0 ||
       InpInternalLength < 1 || InpSwingLength < 1 || (!InpUseInternalBlocks && !InpUseSwingBlocks) ||
       !InitTradingHours())
      {
@@ -185,10 +194,12 @@ void OnTick()
 
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
-   // Otevřená pozice: výstup po dosažení protějšího pásma, nové vstupy se neotevírají
+   // Otevřená pozice: nové vstupy se neotevírají; při výstupu na pásmu BB ji zavře expert,
+   // při výstupu podle RRR ji zavře TP nebo SL u brokera
    if(ticket != 0)
      {
-      ManagePosition(ticket, bid, bands);
+      if(InpExitMode == EXIT_BANDS)
+         ManagePosition(ticket, bid, bands);
       return;
      }
 
@@ -214,11 +225,10 @@ void UpdateInfo()
       status = "ZAPNUTO – mimo obchodní dobu, nové obchody neotevírá";
 
    // Vzdálenosti stejné jako ve strategii, převedené na body symbolu
-   string earlyExit = InpEarlyExitAtr > 0.0 ? AtrPointsText(InpEarlyExitAtr) + " před pásmem" : "vypnutý (výstup na pásmu)";
    string text = "TondaStrategy " + EA_VERSION + ": " + status +
                  "\nObchodní doba: " + g_hours.Description() +
                  "\nTolerance nového OB: " + AtrPointsText(InpNewBlockTolerance) +
-                 "\nPředčasný výstup: " + earlyExit +
+                 "\nVýstup: " + ExitText() +
                  "\nOdstup SL: " + StopLossOffsetText() +
                  "\nMaximální skluz: " + AtrPointsText(InpSlippageAtr);
    if(text == g_infoText)
@@ -264,6 +274,26 @@ string StopLossOffsetText()
    double spread = CurrentSpread();
    return IntegerToString(ToPoints(InpStopLossSpreadMultiple * spread)) + " bodů (" +
           DoubleToString(InpStopLossSpreadMultiple, 2) + " × spread " + IntegerToString(ToPoints(spread)) + " bodů)";
+  }
+
+// Cena TP: na opačné straně vstupní ceny ve vzdálenosti RRR × vzdálenost SL;
+// 0 = bez TP (výstup na pásmu BB řídí expert)
+double TakeProfitPrice(const bool isBuy, const double price, const double stopLoss)
+  {
+   if(InpExitMode != EXIT_RRR)
+      return 0.0;
+   double targetDistance = InpRiskReward * MathAbs(price - stopLoss);
+   return NormalizeDouble(isBuy ? price + targetDistance : price - targetDistance, _Digits);
+  }
+
+// Popis výstupu z obchodu: TP podle RRR, nebo pásmo BB s případným předčasným výstupem v bodech
+string ExitText()
+  {
+   if(InpExitMode == EXIT_RRR)
+      return "take profit podle RRR 1:" + DoubleToString(InpRiskReward, 2);
+   if(InpEarlyExitAtr > 0.0)
+      return "na pásmu BB, předčasně o " + AtrPointsText(InpEarlyExitAtr);
+   return "na pásmu BB";
   }
 
 // Nastaví maximální skluz obchodních operací na násobek ATR 14; volá se po každé změně ATR
@@ -402,7 +432,8 @@ void CheckEntry(const double bid, const SBandValues &bands)
   }
 
 //+------------------------------------------------------------------+
-//| Otevře pozici se SL za order blockem a objemem podle rizika      |
+//| Otevře pozici se SL za order blockem a objemem podle rizika,     |
+//| při výstupu podle RRR i s TP ve vzdálenosti RRR × vzdálenost SL  |
 //| type – ORDER_TYPE_BUY / ORDER_TYPE_SELL, block – signální OB     |
 //+------------------------------------------------------------------+
 void OpenPosition(const ENUM_ORDER_TYPE type, const SOrderBlock &block)
@@ -422,12 +453,20 @@ void OpenPosition(const ENUM_ORDER_TYPE type, const SOrderBlock &block)
       return;
      }
 
+   // I TP musí být dál než minimální vzdálenost brokera (blíž může vyjít jen při RRR < 1)
+   double takeProfit = TakeProfitPrice(isBuy, price, stopLoss);
+   if(takeProfit != 0.0 && MathAbs(takeProfit - price) <= minDistance)
+     {
+      Print("Signál přeskočen: TP ", takeProfit, " je příliš blízko ceny ", price);
+      return;
+     }
+
    double volume = CalculateVolume(type, price, stopLoss);
    if(volume <= 0.0)
       return;
 
    string comment = "Tonda " + (isBuy ? "BUY" : "SELL") + " OB";
-   if(!g_trade.PositionOpen(_Symbol, type, volume, price, stopLoss, 0.0, comment) ||
+   if(!g_trade.PositionOpen(_Symbol, type, volume, price, stopLoss, takeProfit, comment) ||
       g_trade.ResultRetcode() != TRADE_RETCODE_DONE)
       Print("Obchod se nepodařilo otevřít: ", g_trade.ResultRetcodeDescription());
   }

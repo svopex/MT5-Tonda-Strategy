@@ -43,7 +43,7 @@ MT5 ji ukazuje ve vlastnostech experta):
 
 Commit s novou verzí se označí git tagem `vX.YY` (např. `v1.10`) a tag se pushne spolu s commitem.
 
-Aktuální verze: **1.12** (vypisuje se i v textu vlevo nahoře, např. `TondaStrategy 1.12: ZAPNUTO …`).
+Aktuální verze: **1.20** (vypisuje se i v textu vlevo nahoře, např. `TondaStrategy 1.20: ZAPNUTO …`).
 
 ## Strategie
 
@@ -65,9 +65,18 @@ pozice; dokud trvá, nové signály se ignorují.
 
 ### Výstup z obchodu
 
-Nákup se zavře, jakmile Bid dosáhne horního (červeného) pásma, prodej po dosažení
-dolního (zeleného) pásma. *Předčasný výstup* (násobek ATR 14, 0 = na pásmu) posune výstup
-o tuto vzdálenost dřív; aktuální hodnota v bodech je vidět v textu vlevo nahoře.
+Způsob výstupu určuje volba *Výstup z obchodu*:
+
+- **Na protějším pásmu BB** (výchozí) – nákup se zavře, jakmile Bid dosáhne horního (červeného)
+  pásma, prodej po dosažení dolního (zeleného) pásma. *Předčasný výstup* (násobek ATR 14,
+  0 = na pásmu) posune výstup o tuto vzdálenost dřív; aktuální hodnota v bodech je vidět
+  v textu vlevo nahoře.
+- **Take profit podle RRR** – pozice se otevře s TP ve vzdálenosti *RRR* × vzdálenost SL
+  od vstupní ceny (výchozí RRR 2, tedy SL 1 : TP 2). Pozici zavře TP nebo SL u brokera,
+  pásma BB se pro výstup nepoužijí. Vyšel-li by TP blíž než minimální vzdálenost brokera,
+  obchod se neotevře.
+
+V obou režimech se otevřená pozice navíc zavře v zavírací době (viz *Obchodní doba*).
 
 ### Obchodní doba
 
@@ -119,7 +128,9 @@ Order blocky se počítají z uzavřených svíček; při startu se zpracuje nas
 | Obchod | Magic number | 202610225598 | Identifikace pozic experta |
 | Obchod | Maximální skluz (násobek ATR 14) | 0.15 | Povolená odchylka ceny při obchodu |
 | Obchod | Tolerance nového OB (násobek ATR 14) | 0.5 | Blízkost ceny k nově vzniklému OB |
-| Obchod | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.5 | O kolik dřív se pozice zavře (0 = na pásmu) |
+| Obchod | Výstup z obchodu | Na protějším pásmu BB | Výstup na pásmu BB, nebo take profit podle RRR |
+| Obchod | Předčasný výstup před pásmem BB (násobek ATR 14) | 0.5 | O kolik dřív se pozice zavře (0 = na pásmu), jen při výstupu na pásmu BB |
+| Obchod | RRR – násobek vzdálenosti SL pro TP | 2.0 | Poměr TP ku SL, jen při výstupu podle RRR |
 | Obchodní doba | Zdroj obchodní doby | Podle seancí symbolu v MT5 | Ručně zadané časy, nebo obchodní seance symbolu v MT5 |
 | Obchodní doba | Ručně: začátek obchodování | 02:00 | Od kdy se otevírají nové obchody (čas serveru, HH:MM) |
 | Obchodní doba | Ručně: konec otevírání obchodů | 23:00 | Do kdy se otevírají nové obchody |
@@ -160,8 +171,8 @@ a `SvopexSMC.pine` (v testeru jen ve vizuálním režimu, bez vizualizace se kv�
   vypnuté Algoritmické obchodování v terminálu nebo ve vlastnostech experta, chybějící připojení,
   zákaz obchodování na účtu či symbolu; mimo obchodní dobu `ZAPNUTO – mimo obchodní dobu`),
   obchodní doba (v režimu seancí aktuální seance a z ní odvozené časy otevírání a zavření)
-  a aktuální hodnoty v bodech: tolerance nového OB, předčasný výstup,
-  odstup SL a maximální skluz.
+  a aktuální hodnoty v bodech: tolerance nového OB, výstup (pásmo BB s předčasným výstupem,
+  nebo RRR), odstup SL a maximální skluz.
 
 Vyplněné zóny (order blocky a výplň BB) se kreslí do jedné průhledné bitmapy za svíčkami,
 kde se barvy skládají s průhledností z Pine stejně jako v TradingView – i tam, kde se boxy
